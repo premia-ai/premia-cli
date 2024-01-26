@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
-import os
 from typing import Literal
-import psycopg2
+from db import migration
 
 
 @dataclass
@@ -63,11 +62,7 @@ def pad(value: str, width: int, fill_string=" ") -> str:
 
 
 def inspect() -> str:
-    postgres_url = os.environ.get("POSTGRES_URL")
-    if not postgres_url:
-        raise ValueError("Please set POSTGRES_URL environment variable")
-
-    conn = psycopg2.connect(postgres_url)
+    conn = migration.connect()
     cursor = conn.cursor()
     cursor.execute(table_query)
 
