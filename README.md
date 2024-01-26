@@ -12,22 +12,6 @@ bin/install.sh
 
 ## Subcommands
 
-### `db`
-
-The `db` subcommand allows to setup or interact with an SQL database for financial data.
-
-### `init`
-
-`init` will set up a duckdb instance structured to store financial data.
-
-### `inpect`
-
-The `inspect` command will show your database's schema.
-
-### `import`
-
-The `import` command allows to import data from dataproviders or a CSV file into your db.
-
 ### `ai`
 
 The `ai` subcommand allows to setup and use an open source LLM to interact with your infrastructure.
@@ -57,19 +41,20 @@ WHERE companies.name = 'Tesla Inc.' AND EXTRACT(YEAR FROM stocks_1_day_candles.b
 
 ### `db`
 
-Subcommand to initialize and query your financial database.
+The `db` subcommand allows to setup or interact with an SQL database for financial data.
 
 #### `init`
 
-Setup a financial database
+`init` will set up a duckdb instance structured to store financial data.
 
-#### `seed` (TODO)
+#### `inpect`
 
-Import data from data providers like Polygon and TwelveData.
+The `inspect` command will show your database's schema.
 
-#### `inspect`
+#### `import`
 
-Inspects your Postgres database and prints out the schema.
+The `import` command allows to import data from dataproviders or a CSV file into your db.
+
 
 ## Dev Requirements
 
