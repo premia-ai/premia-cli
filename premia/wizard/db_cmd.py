@@ -21,12 +21,25 @@ def setup() -> None:
 
     template.create_migration_file("add_timescale")
 
-    add_stocks = click.confirm("Do you want to store stock price data?")
-    if add_stocks:
+    answer = click.prompt(
+        "Which instruments do you want to store?",
+        type=click.Choice(
+            [
+                types.InstrumentType.Stocks.value,
+                types.InstrumentType.Options.value,
+                "both",
+                "none",
+            ]
+        ),
+    )
+
+    if answer == "none":
+        return
+
+    if answer == types.InstrumentType.Stocks.value or answer == "both":
         add_instrument_migrations(types.InstrumentType.Stocks)
 
-    add_options = click.confirm("Do you want to store option price data?")
-    if add_options:
+    if answer == types.InstrumentType.Options.value or answer == "both":
         add_instrument_migrations(types.InstrumentType.Options)
 
     migration.apply_all(migration.connect(), migrations_dir)
@@ -62,8 +75,10 @@ def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
     elif instrument_type == types.InstrumentType.Options:
         template.create_migration_file("add_contracts")
 
-    add_aggregate = click.confirm(
-        "Do you want to create an aggregate based on your raw data?"
+    bigger_units = timespan_info.bigger_units
+    response = click.prompt(
+        f"Do you want to create an aggregate based on your {instrument_type.value}' raw data?",
+        type=click.Option(bigger_units + ["no"]),
     )
 
     # TODO: Update config with the base table value
@@ -77,19 +92,12 @@ def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
         ),
     )
 
-    if add_aggregate:
-        bigger_units = timespan_info.bigger_units
-
-        aggregate_timespan_unit = click.prompt(
-            "Which duration should the table have?",
-            type=click.Choice(bigger_units),
-        )
-
+    if response != "no":
         aggregate_timespan_info = next(
             (
                 timespan_info
                 for timespan_info in types.timespan_info.values()
-                if timespan_info.unit == aggregate_timespan_unit
+                if timespan_info.unit == response
             ),
             None,
         )
@@ -108,19 +116,15 @@ def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
             ),
         )
 
-    add_feature = click.confirm(
-        "Do you want to create a feature table based on your raw data?"
+    feature_names = template.get_feature_names()
+    response = click.prompt(
+        f"Do you want to create a feature table based on your {instrument_type.value}' raw data?",
+        type=click.Choice(feature_names + ["no"]),
     )
 
-    if add_feature:
-        feature_names = template.get_feature_names()
-        feature_name = click.prompt(
-            "Which feature would you like to add?",
-            type=click.Choice(feature_names),
-        )
-
+    if response != "no":
         template.create_migration_file(
-            feature_name,
+            response,
             template.SqlTemplateData(
                 instrument_type=instrument_type,
                 quantity=1,
@@ -136,29 +140,38 @@ def seed():
     if config_file_data is None:
         raise Exception("Config must be set up to seed DB.")
 
-    for instrument_type in config_file_data.instruments.keys():
-        providers = providers_per_instrument[instrument_type]
+        response = click.prompt(
+            "Do you want to import data?",
+            type=click.Choice(
+                [
+                    types.InstrumentType.Stocks.value,
+                    types.InstrumentType.Options.value,
+                    "both",
+                    "no",
+                ]
+            ),
+        )
 
-        if not click.confirm(
-            f"Do you want to import data for {instrument_type}?"
-        ):
-            continue
-
-        if len(providers) > 1:
-            provider = click.prompt(
-                "Which method would you like to use to import the data?",
-                type=click.Choice(providers),
-            )
-        else:
-            provider = providers[0]
-
-        import_data(provider, instrument_type)
+        if response == "no":
+            return
+        if response == types.InstrumentType.Stocks.value or response == "both":
+            import_data(types.InstrumentType.Stocks.value)
+        if response == types.InstrumentType.Options.value or response == "both":
+            import_data(types.InstrumentType.Options.value)
 
 
 def import_data(
-    provider: str,
     instrument_type: str,
 ):
+    providers = providers_per_instrument[instrument_type]
+    if len(providers) > 1:
+        provider = click.prompt(
+            "Which method would you like to use to import the data?",
+            type=click.Choice(providers),
+        )
+    else:
+        provider = providers[0]
+
     try:
         if provider == types.DataProvider.Polygon.value:
             import_from_polygon(instrument_type)
