@@ -19,8 +19,6 @@ providers_per_instrument = {
 def setup() -> None:
     migrations_dir = config.migrations_dir(True)
 
-    template.create_migration_file("add_timescale")
-
     answer = click.prompt(
         "Which instruments do you want to store?",
         type=click.Choice(
@@ -42,7 +40,9 @@ def setup() -> None:
     if answer == types.InstrumentType.Options.value or answer == "both":
         add_instrument_migrations(types.InstrumentType.Options)
 
-    migration.apply_all(migration.connect(), migrations_dir)
+    conn = migration.connect()
+    migration.setup(conn)
+    migration.apply_all(conn, migrations_dir)
 
 
 def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
@@ -53,10 +53,7 @@ def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
         type=click.Choice(timespan_units),
     )
 
-    timespan_info = next(
-        (ti for ti in types.timespan_info.values() if ti.unit == timespan_unit),
-        None,
-    )
+    timespan_info = types.timespan_info.get(timespan_unit)
 
     if timespan_info is None:
         click.echo("Invalid timespan unit selected.")
@@ -75,13 +72,11 @@ def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
     elif instrument_type == types.InstrumentType.Options:
         template.create_migration_file("add_contracts")
 
-    bigger_units = timespan_info.bigger_units
     response = click.prompt(
         f"Do you want to create an aggregate based on your {instrument_type.value}' raw data?",
-        type=click.Option(bigger_units + ["no"]),
+        type=click.Choice(timespan_info.bigger_units + ["no"]),
     )
 
-    # TODO: Update config with the base table value
     base_table = f"{instrument_type.value}_1_{timespan_unit}_candles"
 
     config.update_config(

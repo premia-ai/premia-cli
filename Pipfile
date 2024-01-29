@@ -8,9 +8,11 @@ click = "*"
 accelerate = "*"
 huggingface-hub = "*"
 llama-cpp-python = "*"
-psycopg2 = "*"
 jinja2 = "*"
 polygon-api-client = "*"
+yfinance = "*"
+duckdb = "*"
+pandas = "*"
 
 [dev-packages]
 

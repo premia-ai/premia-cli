@@ -10,7 +10,5 @@ CREATE TABLE IF NOT EXISTS {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_
     data_provider TEXT NOT NULL
 );
 
-SELECT create_hypertable('{{ instrument_type }}_{{ quantity }}_{{ time_unit }}_candles', by_range('time'));
-
 CREATE UNIQUE INDEX IF NOT EXISTS {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_candles_symbol_time_idx
 ON {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_candles (symbol, time DESC);

@@ -8,6 +8,8 @@ TMP_DIR = f"{CONFIG_DIR}/tmp"
 MIGRATIONS_DIR = f"{CONFIG_DIR}/migrations"
 CONFIG_FILE_NAME = "config.json"
 CONFIG_FILE_PATH = f"{CONFIG_DIR}/{CONFIG_FILE_NAME}"
+DEFAULT_DB_FILE_NAME = "securities.db"
+DEFAULT_DB_FILE_PATH = f"{CONFIG_DIR}/{DEFAULT_DB_FILE_NAME}"
 
 
 def get_dir(dir_path: str, create_if_missing=False) -> str:
@@ -34,6 +36,12 @@ def tmp_dir(create_if_missing=False) -> str:
     return get_dir(TMP_DIR, create_if_missing)
 
 
+def db_path() -> str:
+    return os.path.expanduser(
+        os.getenv("DB_PATH") or config.DEFAULT_DB_FILE_PATH
+    )
+
+
 @dataclass
 class InstrumentConfig:
     base_table: str
@@ -43,6 +51,7 @@ class InstrumentConfig:
 @dataclass
 class ConfigFileData:
     version: str = "1"
+    database: str = "DuckDB"
     instruments: dict[str, InstrumentConfig] = field(default_factory=dict)
 
     @classmethod

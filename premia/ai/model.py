@@ -1,10 +1,10 @@
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
-from db import postgres
+from db import internals
 from utils.loader import Loader
 
 SYSTEM_PROMPT_TEMPLATE = """
-PostgreSQL database schema:
+DuckDB SQL-database schema:
 ```sql
 {db_schema}
 ```
@@ -50,7 +50,7 @@ def create_completion(user_prompt: str, verbose: bool):
         "top_k": 0,
     }
 
-    db_schema = postgres.inspect()
+    db_schema = internals.inspect()
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(db_schema=db_schema)
     input = f"{system_prompt}[SPEC]{user_prompt}[/SPEC]</s> "
 

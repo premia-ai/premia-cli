@@ -1,6 +1,6 @@
 import click
 from ai import model
-from db import postgres
+from db import internals
 from utils import config
 import wizard.db_cmd
 
@@ -65,7 +65,7 @@ def db():
 @db.command()
 def inspect():
     try:
-        db_schema = postgres.inspect()
+        db_schema = internals.inspect()
         click.echo(db_schema)
     except ValueError as e:
         click.secho(e, fg="red")

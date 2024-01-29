@@ -1,39 +1,26 @@
 import os
-from urllib.parse import urlparse
-import psycopg2
-from psycopg2.extensions import connection
-from utils import types
+import duckdb
+from utils import types, config
 
 
-def connect() -> connection:
-    postgres_url = os.getenv("POSTGRES_URL")
-    if postgres_url is None:
-        raise ValueError("Please set POSTGRES_URL environment variable")
-
-    parsed_url = urlparse(postgres_url)
-    return psycopg2.connect(
-        dbname=parsed_url.path[1:],
-        user=parsed_url.username,
-        password=parsed_url.password,
-        port=parsed_url.port,
-        host=parsed_url.hostname,
-    )
+def connect() -> duckdb.DuckDBPyConnection:
+    return duckdb.connect(config.db_path())
 
 
-def setup(conn: connection) -> None:
+def setup(conn: duckdb.DuckDBPyConnection) -> None:
     with conn.cursor() as cursor:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 version VARCHAR PRIMARY KEY,
                 applied BOOLEAN NOT NULL DEFAULT FALSE
-            )
+            );
         """
         )
         conn.commit()
 
 
-def apply(conn: connection, file_path: str) -> None:
+def apply(conn: duckdb.DuckDBPyConnection, file_path: str) -> None:
     version = get_migration_version(os.path.basename(file_path))
     with conn.cursor() as cursor:
         with open(file_path, "r") as file:
@@ -43,20 +30,20 @@ def apply(conn: connection, file_path: str) -> None:
                 cursor.execute(
                     """
                     INSERT INTO schema_migrations (version, applied)
-                    VALUES (%s, TRUE)
-                    ON CONFLICT (version) DO UPDATE SET applied = TRUE
+                    VALUES (?, TRUE)
+                    ON CONFLICT (version) DO UPDATE SET applied = TRUE;
                 """,
-                    (version,),
+                    [version],
                 )
                 conn.commit()
-            except psycopg2.DatabaseError as e:
-                conn.rollback()
+            except Exception as e:
+                # conn.rollback()
                 raise types.MigrationError(
                     f"Error applying migration {file_path}: {e}"
                 )
 
 
-def apply_all(conn: connection, directory: str) -> None:
+def apply_all(conn: duckdb.DuckDBPyConnection, directory: str) -> None:
     """
     Apply all migrations in the specified directory that are newer than the last applied migration.
 
@@ -66,7 +53,13 @@ def apply_all(conn: connection, directory: str) -> None:
 
     with conn.cursor() as cursor:
         cursor.execute(
-            "SELECT version FROM schema_migrations WHERE applied = TRUE ORDER BY version DESC LIMIT 1;"
+            """
+            SELECT version
+            FROM schema_migrations
+            WHERE applied = TRUE
+            ORDER BY version
+            DESC LIMIT 1;
+        """
         )
         last_applied_version = cursor.fetchone()
         last_applied_version = (
@@ -82,36 +75,27 @@ def apply_all(conn: connection, directory: str) -> None:
             apply(conn, os.path.join(directory, filename))
 
 
-def reset(conn: connection) -> None:
-    with conn.cursor() as cursor:
-        cursor.execute(
-            """
-            DROP SCHEMA public CASCADE;
-            CREATE SCHEMA public;
-            GRANT ALL ON SCHEMA public TO postgres, public;
-            COMMENT ON SCHEMA public IS 'standard public schema';
-        """
-        )
-        conn.commit()
+def reset() -> None:
+    db_path = config.db_path()
+    if os.path.exists(db_path):
+        try:
+            os.remove(db_path)
+        except Exception as e:
+            print(
+                f"An error occurred while deleting the DB at '{db_path}': {e}"
+            )
 
+    conn = connect()
     setup(conn)
 
 
-def copy_csv(conn: connection, csv_path: str, table) -> None:
+def copy_csv(conn: duckdb.DuckDBPyConnection, csv_path: str, table) -> None:
     """
     Copy the contents of a CSV file to the designated PostgreSQL table.
     """
     with conn.cursor() as cursor:
-        try:
-            with open(csv_path, "r") as csv:
-                cursor.copy_expert(
-                    f"COPY {table} TO STDIN DELIMITER ',' CSV HEADER;",
-                    csv,
-                )
-            conn.commit()
-        except (Exception, psycopg2.DatabaseError) as e:
-            conn.rollback()
-            raise types.MigrationError(e)
+        cursor.sql(f"COPY {table} FROM '{csv_path}' DELIMITER ',' CSV HEADER;")
+        conn.commit()
 
 
 def get_migration_version(filename: str) -> str:

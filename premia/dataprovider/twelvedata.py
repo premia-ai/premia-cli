@@ -1,9 +1,9 @@
 import os
 import requests
+import pandas as pd
 from datetime import datetime
 from typing import Any
-import psycopg2
-from psycopg2.extras import execute_values
+from dataclasses import asdict
 from urllib.parse import urlencode
 from utils import types
 from db import migration
@@ -19,25 +19,21 @@ accepted_timespans = [
 
 
 def import_market_data(api_params: types.ApiParams):
-    # TODO: Move the Postgres connect function to another module
+    # TODO: Move the connect function to another module
     conn = migration.connect()
 
-    candles = get_aggregates(api_params)
-    columns = list(candles[0].__dict__.keys())
-    rows = [tuple(candle.__dict__.values()) for candle in candles]
+    market_data_rows = get_aggregates(api_params)
+    rows_df = pd.DataFrame([asdict(row) for row in market_data_rows])
+    conn = migration.connect()
 
     try:
-        with conn.cursor() as cursor:
-            execute_values(
-                cursor,
-                f"INSERT INTO {api_params.table} ({','.join(columns)}) VALUES %s",
-                rows,
-            )
-        conn.commit()
-    except psycopg2.Error as e:
-        raise types.DataImportError(e)
-    finally:
-        conn.close()
+        rows_df.to_sql(
+            api_params.table, con=conn, if_exists="append", index=False
+        )
+    except Exception as e:
+        raise types.DataImportError(
+            f"Failed to copy twelvedata.com data to table '{api_params.table}': {e}"
+        )
 
 
 def get_aggregates(api_params: types.ApiParams):

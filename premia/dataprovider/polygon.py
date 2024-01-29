@@ -2,10 +2,11 @@ import os
 from typing import cast
 from polygon import RESTClient
 from polygon.rest import models
-from psycopg2.extras import execute_values
 from datetime import datetime
 from utils import types
 from db import migration
+import pandas as pd
+from dataclasses import asdict
 
 accepted_timespans = [
     types.Timespan.SECOND.value,
@@ -63,21 +64,16 @@ def import_market_data(api_params: types.ApiParams) -> None:
     market_data_rows = [
         map_agg_to_market_data_row(api_params.ticker[0], agg) for agg in aggs
     ]
-    columns = list(market_data_rows[0].__dict__.keys())
-    rows = [tuple(mdr.__dict__.values()) for mdr in market_data_rows]
-
+    rows_df = pd.DataFrame([asdict(row) for row in market_data_rows])
     conn = migration.connect()
+
     try:
-        with conn.cursor() as cursor:
-            execute_values(
-                cursor,
-                f"INSERT INTO {api_params.table} ({', '.join(columns)}) VALUES %s",
-                rows,
-            )
-        conn.commit()
+        rows_df.to_sql(
+            api_params.table, con=conn, if_exists="append", index=False
+        )
     except Exception as e:
         raise types.DataImportError(
-            f"Failed to copy polygon.io data to database: {e}"
+            f"Failed to copy polygon.io data to table '{api_params.table}': {e}"
         )
 
     conn.close()

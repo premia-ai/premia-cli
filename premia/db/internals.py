@@ -31,10 +31,7 @@ CREATE TABLE {self.name} (
 );
             """.strip()
 
-        return f"""
-CREATE VIEW {self.name} AS 
-{self.view_definition}
-            """
+        return f"\n{self.view_definition}"
 
 
 # Based on: https://atlasgo.io/blog/2022/02/09/programmatic-inspection-in-go-with-atlas
@@ -42,15 +39,15 @@ table_query = """
 SELECT c.table_name,
        t.table_type,
        c.column_name,
-       UPPER(c.udt_name) as column_type,
+       UPPER(c.data_type) as column_type,
        c.is_nullable AS column_type_is_nullable,
-       v.view_definition
+       v.sql as view_definition
 FROM "information_schema"."columns" AS c
 LEFT JOIN "information_schema"."tables" AS t
 ON c.table_name = t.table_name
-LEFT JOIN "information_schema"."views" as v	
-ON c.table_name = v.table_name
-WHERE c.table_schema = 'public' AND c.table_name != 'schema_migrations'
+LEFT JOIN duckdb_views() as v	
+ON c.table_name = v.view_name
+WHERE c.table_name != 'schema_migrations'
 ORDER BY c.table_name, c.ordinal_position;
 """
 
@@ -63,32 +60,30 @@ def pad(value: str, width: int, fill_string=" ") -> str:
 
 def inspect() -> str:
     conn = migration.connect()
-    cursor = conn.cursor()
-    cursor.execute(table_query)
 
     parsed_tables = {}
-    for row in cursor.fetchall():
-        (
-            table_name,
-            table_type,
-            column_name,
-            column_data_type,
-            column_is_nullable,
-            view_definition,
-        ) = row
-        column_is_nullable = column_is_nullable == "YES"
-        table_type = table_type if table_type == "VIEW" else "TABLE"
+    with conn.cursor() as cursor:
+        cursor.execute(table_query)
 
-        if table_name not in parsed_tables:
-            parsed_tables[table_name] = Table(
-                table_name, table_type, view_definition
-            )
+        for row in cursor.fetchall():
+            (
+                table_name,
+                table_type,
+                column_name,
+                column_data_type,
+                column_is_nullable,
+                view_definition,
+            ) = row
+            column_is_nullable = column_is_nullable == "YES"
+            table_type = table_type if table_type == "VIEW" else "TABLE"
 
-        column = Column(column_name, column_data_type, column_is_nullable)
-        parsed_tables[table_name].columns.append(column)
+            if table_name not in parsed_tables:
+                parsed_tables[table_name] = Table(
+                    table_name, table_type, view_definition
+                )
 
-    cursor.close()
-    conn.close()
+            column = Column(column_name, column_data_type, column_is_nullable)
+            parsed_tables[table_name].columns.append(column)
 
     db_schema = ""
     for table in parsed_tables.values():
