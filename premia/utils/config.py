@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from utils import types
 
 CONFIG_DIR = ".premia"
-TMP_DIR = f"{CONFIG_DIR}/tmp"
 MIGRATIONS_DIR = f"{CONFIG_DIR}/migrations"
 CONFIG_FILE_NAME = "config.json"
 CONFIG_FILE_PATH = f"{CONFIG_DIR}/{CONFIG_FILE_NAME}"
@@ -30,10 +29,6 @@ def config_dir(create_if_missing=False) -> str:
 
 def migrations_dir(create_if_missing=False) -> str:
     return get_dir(MIGRATIONS_DIR, create_if_missing)
-
-
-def tmp_dir(create_if_missing=False) -> str:
-    return get_dir(TMP_DIR, create_if_missing)
 
 
 def db_path() -> str:
@@ -78,11 +73,8 @@ class ConfigFileData:
 def update_config(
     instrument_type: types.InstrumentType, data: InstrumentConfig
 ) -> None:
-    config_dir_path = config_dir()
-    config_file_path = os.path.join(config_dir_path, CONFIG_FILE_NAME)
+    config_file_path = config_file()
     config_file_data = config()
-    if not config_file_data:
-        raise types.ConfigError("Config must be set up to update it.")
 
     config_file_data.instruments[instrument_type.value] = data
 
@@ -90,19 +82,22 @@ def update_config(
         json.dump(config_file_data.to_dict(), file, indent=2)
 
 
-def config() -> "ConfigFileData | None":
-    config_file_path = config_file()
+def config(create_if_missing=False) -> "ConfigFileData":
+    config_file_path = config_file(create_if_missing)
 
     with open(config_file_path, "r") as file:
         config_data = json.load(file)
         return ConfigFileData.from_dict(config_data)
 
 
-def config_file() -> str:
+def config_file(create_if_missing=False) -> str:
     config_dir_path = config_dir(True)
     config_file_path = os.path.join(config_dir_path, CONFIG_FILE_NAME)
 
     if not os.path.exists(config_file_path):
+        if not create_if_missing:
+            raise types.ConfigError("'config.json' doesn't exist.")
+
         config_file_data = ConfigFileData()
         with open(config_file_path, "w") as file:
             json.dump(config_file_data.to_dict(), file, indent=2)
@@ -114,6 +109,5 @@ def setup_config_dir() -> str:
     config_dir_path = config_dir(True)
     config_file()
     migrations_dir(True)
-    tmp_dir(True)
 
     return config_dir_path
