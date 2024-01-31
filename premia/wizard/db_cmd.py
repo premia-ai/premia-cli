@@ -1,4 +1,5 @@
 import click
+import os
 from dataprovider import twelvedata, polygon
 from utils import config, types
 from db import template, migration
@@ -129,30 +130,31 @@ def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
         )
 
 
+# TODO: Move the import logic to a separate module
 def seed():
-    config_file_data = config.config()
-
-    if config_file_data is None:
+    try:
+        config.config()
+    except types.ConfigError:
         raise Exception("Config must be set up to seed DB.")
 
-        response = click.prompt(
-            "Do you want to import data?",
-            type=click.Choice(
-                [
-                    types.InstrumentType.Stocks.value,
-                    types.InstrumentType.Options.value,
-                    "both",
-                    "no",
-                ]
-            ),
-        )
+    response = click.prompt(
+        "Do you want to import data?",
+        type=click.Choice(
+            [
+                types.InstrumentType.Stocks.value,
+                types.InstrumentType.Options.value,
+                "both",
+                "no",
+            ]
+        ),
+    )
 
-        if response == "no":
-            return
-        if response == types.InstrumentType.Stocks.value or response == "both":
-            import_data(types.InstrumentType.Stocks.value)
-        if response == types.InstrumentType.Options.value or response == "both":
-            import_data(types.InstrumentType.Options.value)
+    if response == "no":
+        return
+    if response == types.InstrumentType.Stocks.value or response == "both":
+        import_data(types.InstrumentType.Stocks.value)
+    if response == types.InstrumentType.Options.value or response == "both":
+        import_data(types.InstrumentType.Options.value)
 
 
 def import_data(
@@ -181,27 +183,35 @@ def import_data(
 
 
 def import_from_csv(instrument_type: str):
-    config_file_data = config.config()
-    if not config_file_data:
-        raise types.WizardError("Config must be set up to copy data from CSV.")
+    candles_csv_path = click.prompt(
+        f"What is the path to your {instrument_type} raw data CSV file?"
+    )
 
-    csv_path = click.prompt("What is the path to your CSV file?")
+    instrument_config = config.config().instruments[instrument_type]
     conn = migration.connect()
+    migration.copy_csv(
+        conn,
+        os.path.expanduser(candles_csv_path),
+        instrument_config.base_table,
+    )
+
+    if instrument_type == types.InstrumentType.Options.value:
+        metadata_table = "contracts"
+    else:
+        metadata_table = "companies"
+
+    metadata_csv_path = click.prompt(
+        f"What is the path to your {metadata_table} CSV file?"
+    )
 
     migration.copy_csv(
         conn,
-        csv_path,
-        config_file_data.instruments[instrument_type].base_table,
+        os.path.expanduser(metadata_csv_path),
+        metadata_table,
     )
 
 
 def import_from_twelvedata():
-    config_file_data = config.config()
-    if not config_file_data:
-        raise types.WizardError(
-            "Config must be set up to import data from Twelvedata."
-        )
-
     ticker = click.prompt(
         "What's the ticker of the instrument you would like to download?"
     )
@@ -215,6 +225,7 @@ def import_from_twelvedata():
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
+    config_file_data = config.config()
     stocks_config = config_file_data.instruments[
         types.InstrumentType.Stocks.value
     ]
@@ -232,14 +243,6 @@ def import_from_twelvedata():
 
 
 def import_from_polygon(instrument: str):
-    config_file_data = config.config()
-    if not config_file_data:
-        raise types.WizardError(
-            "Config must be set up to import data from Polygon.io."
-        )
-
-    instrument_config = config_file_data.instruments[instrument]
-
     ticker = click.prompt(
         "What's the ticker of the instrument you would like to download?"
     )
@@ -252,6 +255,7 @@ def import_from_polygon(instrument: str):
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
+    instrument_config = config.config().instruments[instrument]
     polygon.import_market_data(
         types.ApiParams(
             ticker=ticker,
