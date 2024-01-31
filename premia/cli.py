@@ -1,7 +1,7 @@
 import click
 from ai import model
-from db import internals
-from utils import config
+from db import internals, migration
+from utils import config, types
 import wizard.db_cmd
 
 
@@ -100,6 +100,31 @@ def db_import():
     except Exception as e:
         click.secho(e, fg="red")
         raise click.Abort()
+
+
+@db.command("add")
+@click.argument(
+    "instrument_type",
+    type=click.Choice(
+        [types.InstrumentType.Stocks.value, types.InstrumentType.Options.value]
+    ),
+)
+def db_add(instrument_type: str):
+    """
+    Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init`.
+    """
+    config_file_data = config.config()
+
+    if config_file_data.instruments.get(instrument_type):
+        click.secho(
+            f"{instrument_type.capitalize()} have already been setup.", fg="red"
+        )
+        raise click.Abort()
+
+    wizard.db_cmd.add_instrument_migrations(
+        types.InstrumentType(instrument_type)
+    )
+    migration.apply_all(migration.connect(), config.migrations_dir())
 
 
 if __name__ == "__main__":
