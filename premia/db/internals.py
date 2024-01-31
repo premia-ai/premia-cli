@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, cast
 from db import migration
 
 
@@ -43,8 +43,8 @@ SELECT c.table_name,
        UPPER(c.data_type) as column_type,
        c.is_nullable AS column_type_is_nullable,
        v.sql as view_definition
-FROM "information_schema"."columns" AS c
-LEFT JOIN "information_schema"."tables" AS t
+FROM information_schema.columns AS c
+LEFT JOIN information_schema.tables AS t
 ON c.table_name = t.table_name
 LEFT JOIN duckdb_views() as v	
 ON c.table_name = v.view_name
@@ -57,6 +57,20 @@ def pad(value: str, width: int, fill_string=" ") -> str:
     filler = fill_string * width
     new_line = "\n"
     return f"{filler}{value.replace(new_line, new_line + filler)}"
+
+
+def tables() -> list[str]:
+    conn = migration.connect()
+    conn.execute(
+        """
+SELECT table_name
+FROM information_schema.tables
+WHERE table_name != 'schema_migrations'
+ORDER BY table_name;
+"""
+    )
+    result = cast(list[tuple[str]], conn.fetchall())
+    return [table for table, in result]
 
 
 def inspect() -> str:
@@ -90,4 +104,4 @@ def inspect() -> str:
     for table in parsed_tables.values():
         db_schema += table.sql_string() + "\n\n"
 
-    return db_schema
+    return db_schema.rstrip()

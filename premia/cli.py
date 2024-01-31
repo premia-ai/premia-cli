@@ -63,10 +63,22 @@ def db():
 
 
 @db.command()
-def inspect():
+def schema():
+    """Print SQL schema of your db."""
     try:
         db_schema = internals.inspect()
         click.echo(db_schema)
+    except Exception as e:
+        click.secho(e, fg="red")
+        raise click.Abort()
+
+
+@db.command()
+def tables():
+    """List tables in your db."""
+    try:
+        tables = internals.tables()
+        click.echo("\n".join(tables))
     except ValueError as e:
         click.secho(e, fg="red")
         raise click.Abort()

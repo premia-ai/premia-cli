@@ -47,9 +47,13 @@ The `db` subcommand allows to setup or interact with an SQL database for financi
 
 `init` will set up a duckdb instance structured to store financial data.
 
-#### `inpect`
+#### `schema`
 
-The `inspect` command will show your database's schema.
+The `schema` command will print your database's schema to stdout.
+
+#### `tables`
+
+The `tables` command will print the tables of your database to stdout.
 
 #### `import`
 
