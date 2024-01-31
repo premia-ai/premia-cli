@@ -89,7 +89,9 @@ def reset() -> None:
     setup(conn)
 
 
-def copy_csv(conn: duckdb.DuckDBPyConnection, csv_path: str, table) -> None:
+def copy_csv(
+    conn: duckdb.DuckDBPyConnection, csv_path: str, table: str
+) -> None:
     """
     Copy the contents of a CSV file to the designated PostgreSQL table.
     """
