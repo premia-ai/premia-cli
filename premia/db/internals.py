@@ -18,7 +18,7 @@ class Column:
 class Table:
     name: str
     type: Literal["TABLE", "VIEW"]
-    view_definition: str | None
+    view_definition: str = ""
     columns: list[Column] = field(default_factory=list)
 
     def sql_string(self) -> str:
@@ -31,10 +31,11 @@ CREATE TABLE {self.name} (
 );
             """.strip()
 
-        return f"\n{self.view_definition}"
+        return self.view_definition.strip()
 
 
 # Based on: https://atlasgo.io/blog/2022/02/09/programmatic-inspection-in-go-with-atlas
+# Adapted for DuckDB
 table_query = """
 SELECT c.table_name,
        t.table_type,
@@ -48,7 +49,7 @@ ON c.table_name = t.table_name
 LEFT JOIN duckdb_views() as v	
 ON c.table_name = v.view_name
 WHERE c.table_name != 'schema_migrations'
-ORDER BY c.table_name, c.ordinal_position;
+ORDER BY t.table_type, c.table_name, c.ordinal_position;
 """
 
 
@@ -87,6 +88,6 @@ def inspect() -> str:
 
     db_schema = ""
     for table in parsed_tables.values():
-        db_schema += table.sql_string() + "\n"
+        db_schema += table.sql_string() + "\n\n"
 
     return db_schema
