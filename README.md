@@ -12,14 +12,14 @@ The easiest way to try Premia is to follow the following steps:
 
 ```sh
 # Download project
-git clone https://github.com/premia-ai/cli premia
-cd premia
+git clone https://github.com/premia-ai/cli premia-cli
+cd premia-cli
 
 # Install project
 chmod +x bin/install.sh
 bin/install.sh
 
-# Set up sample DB
+# Set up sample DB and optionally import data
 premia db init
 
 # Set up local AI
@@ -47,7 +47,17 @@ You can download an LLM using `init`. By default it will install the Mistral 7B 
 
 **Example**
 ```sh
-premia ai init  
+premia ai init
+```
+
+If you want to use another open source LLM you can do so by specifying a repo and GGUF file from [HuggingFace](https://huggingface.co).
+
+**Example**
+
+Here an example on how to set up Mistral's bigger 8x7B Mixtral model.
+
+```sh
+premia ai init --repo "TheBloke/Mixtral-8x7B-v0.1-GGUF" --file "mixtral-8x7b-v0.1.Q5_K_M.gguf"
 ```
 
 #### `query`
@@ -55,16 +65,16 @@ premia ai init
 With `query` you can ask the LLM to create SQL commands for you to query your db. The flow allows for multiple steps.
 
 **Example**
-```sh
+````sh
 premia ai query 'Get the average stock price of a company with the name "Tesla Inc." for the year 2024'
 
-\`\`\`sql
+```sql
 SELECT AVG(stocks_1_day_candles.close) as avg_price
 FROM companies
 JOIN stocks_1_day_candles ON companies.symbol = stocks_1_day_candles.symbol
 WHERE companies.name = 'Tesla Inc.' AND EXTRACT(YEAR FROM stocks_1_day_candles.bucket) = 2024;
-\`\`\`
 ```
+````
 
 ### `db`
 
