@@ -1,14 +1,14 @@
 import os
 import json
 from dataclasses import dataclass, field
-from utils import types
+from premia.utils import types
 
 CONFIG_DIR = ".premia"
 MIGRATIONS_DIR = f"{CONFIG_DIR}/migrations"
 CONFIG_FILE_NAME = "config.json"
 CONFIG_FILE_PATH = f"{CONFIG_DIR}/{CONFIG_FILE_NAME}"
-DEFAULT_DB_FILE_NAME = "securities.db"
-DEFAULT_DB_FILE_PATH = f"{CONFIG_DIR}/{DEFAULT_DB_FILE_NAME}"
+DEFAULT_DATABASE_FILE_NAME = "securities.db"
+DEFAULT_DATABASE_PATH = f"{CONFIG_DIR}/{DEFAULT_DATABASE_FILE_NAME}"
 
 
 def get_dir(dir_path: str, create_if_missing=False) -> str:
@@ -33,7 +33,7 @@ def migrations_dir(create_if_missing=False) -> str:
 
 def db_path() -> str:
     return os.path.expanduser(
-        os.getenv("DB_PATH") or config.DEFAULT_DB_FILE_PATH
+        os.getenv("DATABASE_PATH") or DEFAULT_DATABASE_PATH
     )
 
 

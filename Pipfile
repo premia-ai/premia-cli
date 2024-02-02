@@ -13,6 +13,7 @@ polygon-api-client = "*"
 yfinance = "*"
 duckdb = "*"
 pandas = "*"
+openai = "*"
 
 [dev-packages]
 

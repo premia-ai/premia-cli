@@ -1,8 +1,8 @@
 import click
 import os
-from dataprovider import twelvedata, polygon
-from utils import config, types
-from db import template, migration
+from premia.dataprovider import twelvedata, polygon
+from premia.utils import config, types
+from premia.db import template, migration
 
 providers_per_instrument = {
     types.InstrumentType.Stocks.value: [

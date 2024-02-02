@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import time
 import os
 import re
-from utils import config, types
+from premia.utils import config, types
 
 
 @dataclass

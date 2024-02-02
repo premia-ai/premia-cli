@@ -1,20 +1,22 @@
+import os
 import click
-from ai import model
-from db import internals, migration
-from utils import config, types
-import wizard.db_cmd
+from openai import OpenAI
+from premia.ai import model
+from premia.db import internals, migration
+from premia.utils import config, types
+from premia.wizard import db_cmd, ai_cmd
 
 
 @click.version_option("0.0.1", prog_name="premia")
 @click.group()
 def cli():
-    """Cli to setup and interact with financial data infrastructure"""
+    """A cli to setup, manage and interact with financial data infrastructure."""
     pass
 
 
 @cli.group()
 def ai():
-    """Use an open source LLM to interact with your financial data"""
+    """Use an LLM to interact with your data infrastructure."""
     pass
 
 
@@ -29,7 +31,7 @@ def ai():
     "-f", "--file", help="The file name inside the repo you want to download"
 )
 def ai_init(force: bool, name: str, file: str):
-    """Initialize an open source LLM on your machine"""
+    """Initialize an open source LLM on your machine."""
 
     if (name and not file) or (file and not name):
         click.secho(
@@ -51,20 +53,33 @@ def ai_init(force: bool, name: str, file: str):
     is_flag=True,
     help="Print the execution of the LLM",
 )
-def query(prompt: str, verbose: bool):
-    """Turn a natural language query into an SQL command with the help of an open source LLM"""
-    model.create_completion(prompt, verbose=verbose)
+@click.option(
+    "-r",
+    "--remote",
+    default=False,
+    is_flag=True,
+    help="Use a remotely hosted LLM",
+)
+def query(prompt: str, verbose: bool, remote: bool):
+    """Query your data with the help of an LLM."""
+    if remote:
+        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        completion = model.create_remote_completion(prompt, client)
+    else:
+        completion = model.create_local_completion(prompt, verbose=verbose)
+
+    ai_cmd.execute_completion(completion)
 
 
 @cli.group()
 def db():
-    """Setup and inspect your database."""
+    """Setup and manage your data infrastructure."""
     pass
 
 
 @db.command()
 def schema():
-    """Print SQL schema of your db."""
+    """Print schema of your database."""
     try:
         db_schema = internals.inspect()
         click.echo(db_schema)
@@ -75,7 +90,7 @@ def schema():
 
 @db.command()
 def tables():
-    """List tables in your db."""
+    """List tables in your database."""
     try:
         tables = internals.tables()
         click.echo("\n".join(tables))
@@ -86,11 +101,11 @@ def tables():
 
 @db.command("init")
 def db_init():
-    """Initialize a financial database"""
+    """Initialize a financial database."""
     config.setup_config_dir()
 
     try:
-        wizard.db_cmd.setup()
+        db_cmd.setup()
     except Exception as e:
         click.secho(e, fg="red")
         raise click.Abort()
@@ -99,7 +114,7 @@ def db_init():
         return
 
     try:
-        wizard.db_cmd.seed()
+        db_cmd.seed()
     except Exception as e:
         click.secho(e, fg="red")
         raise click.Abort()
@@ -107,11 +122,21 @@ def db_init():
 
 @db.command("import")
 def db_import():
+    """
+    Import data from common financial data vendors.
+    """
     try:
-        wizard.db_cmd.seed()
+        db_cmd.seed()
     except Exception as e:
         click.secho(e, fg="red")
         raise click.Abort()
+
+
+@db.command()
+@click.argument("table_name")
+def show(table_name: str):
+    conn = migration.connect()
+    conn.sql(f"FROM {table_name};").show()
 
 
 @db.command("add")
@@ -123,7 +148,7 @@ def db_import():
 )
 def db_add(instrument_type: str):
     """
-    Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init`.
+    Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init` otherwise.
     """
     config_file_data = config.config()
 
@@ -133,11 +158,6 @@ def db_add(instrument_type: str):
         )
         raise click.Abort()
 
-    wizard.db_cmd.add_instrument_migrations(
-        types.InstrumentType(instrument_type)
-    )
+    db_cmd.add_instrument_migrations(types.InstrumentType(instrument_type))
     migration.apply_all(migration.connect(), config.migrations_dir())
-
-
-if __name__ == "__main__":
-    cli()
+    click.echo(f"Finished setting up {instrument_type} for your system.")

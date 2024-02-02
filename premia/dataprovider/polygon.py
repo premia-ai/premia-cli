@@ -3,10 +3,10 @@ from typing import cast
 from polygon import RESTClient
 from polygon.rest import models
 from datetime import datetime
-from utils import types
-from db import migration
 import pandas as pd
 from dataclasses import asdict
+from premia.utils import types
+from premia.db import migration
 
 accepted_timespans = [
     types.Timespan.SECOND.value,

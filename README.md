@@ -1,6 +1,6 @@
 # Premia Cli
 
-Premia allows to manage financial data infrastructure using an AI co-pilot.
+Premia is an AI co-pilot to manage financial data systems.
 
 ## Demo
 
@@ -8,17 +8,18 @@ Premia allows to manage financial data infrastructure using an AI co-pilot.
 
 ## Setup
 
-Run the following in your terminal from the repo, to install `premia`
+Run the following commands in your terminal from the repo's folder, to install the `premia` command.
 
 ```sh
+chmod +x bin/install.sh
 bin/install.sh
 ```
 
-## Subcommands
+## Commands
 
 ### `ai`
 
-The `ai` subcommand allows to setup and use an open source LLM to interact with your infrastructure.
+The `ai` command allows you to setup and use an open source LLM to interact with your infrastructure.
 
 #### `init`
 
@@ -31,25 +32,27 @@ premia ai init
 
 #### `query`
 
-With `query` you can ask the LLM to create an SQL query for you to query your db.
+With `query` you can ask the LLM to create SQL commands for you to query your db. The flow allows for multiple steps.
 
 **Example**
 ```sh
-premia ai query 'Query the average stock price of a company with the name "Tesla Inc." for the year 2024'
+premia ai query 'Get the average stock price of a company with the name "Tesla Inc." for the year 2024'
 
+\`\`\`sql
 SELECT AVG(stocks_1_day_candles.close) as avg_price
 FROM companies
 JOIN stocks_1_day_candles ON companies.symbol = stocks_1_day_candles.symbol
 WHERE companies.name = 'Tesla Inc.' AND EXTRACT(YEAR FROM stocks_1_day_candles.bucket) = 2024;
+\`\`\`
 ```
 
 ### `db`
 
-The `db` subcommand allows to setup or interact with an SQL database for financial data.
+The `db` command allows to setup or interact with an SQL database for financial data.
 
 #### `init`
 
-`init` will set up a duckdb instance structured to store financial data.
+`init` will set up a DuckDB database structured to store financial data.
 
 #### `schema`
 
@@ -57,14 +60,28 @@ The `schema` command will print your database's schema to stdout.
 
 #### `tables`
 
-The `tables` command will print the tables of your database to stdout.
+The `tables` command will print the tables that are visible to Premia's AI to stdout.
 
 #### `import`
 
-The `import` command allows to import data from dataproviders or a CSV file into your db.
+The `import` command allows to import data from common financial dataproviders (polygon.io, twelvedata.com and yfinance) or a CSV file.
 
+## For contributors
 
-## Dev Requirements
+Feel free to open a Github issue if you want to add functionality to Premia! We are looking forward to talking to you.
+
+### Setup
 
 We manage the repo with [`Pipenv`](https://pipenv.pypa.io/en/latest/#install-pipenv-today).
 
+To install the project's dependencies run
+
+```sh
+pipenv install
+```
+
+To run the project while working on it run
+
+```sh
+pipenv run python -m premia
+```

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Literal, cast
-from db import migration
+from premia.db import migration
 
 
 @dataclass
@@ -21,17 +21,17 @@ class Table:
     view_definition: str = ""
     columns: list[Column] = field(default_factory=list)
 
-    def sql_string(self) -> str:
+    def sql_string(self, use_view_definition=False) -> str:
         column_strings = [column.sql_string() for column in self.columns]
         columns = ",\n".join(column_strings)
-        if self.type == "TABLE":
-            return f"""
+
+        if use_view_definition and self.type == "VIEW":
+            return self.view_definition.strip()
+
+        return f"""
 CREATE TABLE {self.name} (
 {pad(columns, 2)}
-);
-            """.strip()
-
-        return self.view_definition.strip()
+);""".strip()
 
 
 # Based on: https://atlasgo.io/blog/2022/02/09/programmatic-inspection-in-go-with-atlas

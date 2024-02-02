@@ -1,6 +1,6 @@
 import os
 import duckdb
-from utils import types, config
+from premia.utils import types, config
 
 
 def connect() -> duckdb.DuckDBPyConnection:

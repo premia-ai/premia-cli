@@ -1,9 +1,10 @@
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
-from db import internals
-from utils.loader import Loader
+from openai import OpenAI
+from premia.db import internals
+from premia.utils.loader import Loader
 
-SYSTEM_PROMPT_TEMPLATE = """
+LOCAL_SYSTEM_PROMPT_TEMPLATE = """
 DuckDB SQL-database schema:
 ```sql
 {db_schema}
@@ -13,12 +14,26 @@ You are an SQL assistant.
 
 You are given a specification for a database query starting with "[SPEC]" and ending with "[/SPEC]".
 
-Based two things:
-  1. Reason about the steps you need to take to for the query.
-  2. Create a well formatted SQL query based on your reasoning.
+Explain which tables and views are needed for the query. Then write one SQL command to fulfill the specification.
 
-Only include tables specified in the mentioned PostgreSQL database schema.
+Only include tables, views and columns specified in the mentioned database schema.
 [/INST]
+"""
+
+REMOTE_SYSTEM_PROMPT_TEMPLATE = """
+DuckDB SQL-database schema:
+```sql
+{db_schema}
+
+-- contract_type: 'call' or 'put'
+```
+You are an SQL assistant.
+
+You are given a specification for a database query.
+
+Explain which tables and views are needed for the query. Then write one SQL command to fulfill the specification.
+
+Only include tables, views and columns specified in the mentioned database schema.
 """
 
 
@@ -33,7 +48,14 @@ def init(
     return model_path
 
 
-def create_completion(user_prompt: str, verbose: bool):
+def create_ai_prompt(user_prompt: str) -> str:
+    db_schema = internals.inspect()
+    system_prompt = LOCAL_SYSTEM_PROMPT_TEMPLATE.format(db_schema=db_schema)
+    input = f"{system_prompt}[SPEC]{user_prompt}[/SPEC]</s> "
+    return input
+
+
+def create_local_completion(user_prompt: str, verbose: bool) -> str:
     model_path = init()
     llm = Llama(
         model_path=model_path,
@@ -50,16 +72,14 @@ def create_completion(user_prompt: str, verbose: bool):
         "top_k": 0,
     }
 
-    db_schema = internals.inspect()
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(db_schema=db_schema)
-    input = f"{system_prompt}[SPEC]{user_prompt}[/SPEC]</s> "
-
-    responses = llm(input, **generation_kwargs)
+    input = create_ai_prompt(user_prompt)
+    completion = llm(input, **generation_kwargs)
 
     loader = Loader()
     loader.start()
 
-    for response in responses:
+    complete_response = ""
+    for response in completion:
         loader.stop()
         token = (
             response
@@ -67,4 +87,33 @@ def create_completion(user_prompt: str, verbose: bool):
             else response["choices"][0]["text"]
         )
         print(token, end="", flush=True)
+        complete_response += token
     print()
+
+    return complete_response
+
+
+def create_remote_completion(user_prompt: str, ai_client: OpenAI) -> str:
+    db_schema = internals.inspect()
+    system_prompt = REMOTE_SYSTEM_PROMPT_TEMPLATE.format(db_schema=db_schema)
+    stream = ai_client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        stream=True,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    loader = Loader()
+    loader.start()
+
+    complete_response = ""
+    for chunk in stream:
+        loader.stop()
+        token = chunk.choices[0].delta.content or ""
+        print(token, end="", flush=True)
+        complete_response += token
+    print()
+
+    return complete_response
