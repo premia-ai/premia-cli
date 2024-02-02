@@ -6,6 +6,26 @@ Premia is an AI co-pilot to manage financial data systems.
 
 [![Premia Demo](https://cdn.loom.com/sessions/thumbnails/d9c49e1b14834a36a1d8cda5174d17a0-with-play.gif)](https://www.loom.com/share/d9c49e1b14834a36a1d8cda5174d17a0?sid=5f6c93ae-ea47-4d01-a459-f229572ec71a)
 
+## How can I try it?
+
+The easiest way to try Premia is to follow the following steps:
+
+```sh
+# Download project
+git clone https://github.com/premia-ai/cli premia
+cd premia
+
+# Install project
+chmod +x bin/install.sh
+bin/install.sh
+
+# Set up sample DB
+premia db init
+
+# Set up local AI
+premia ai init
+```
+
 ## Setup
 
 Run the following commands in your terminal from the repo's folder, to install the `premia` command.
