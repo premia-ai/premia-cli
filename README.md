@@ -1,8 +1,12 @@
 # Premia Cli
 
-Premia allows to bootstrap financial data infrastructure for asset management firms.
+Premia allows to manage financial data infrastructure using an AI co-pilot.
 
-## Installation
+## Demo
+
+[![Premia Demo](https://cdn.loom.com/sessions/thumbnails/d9c49e1b14834a36a1d8cda5174d17a0-with-play.gif)](https://www.loom.com/share/d9c49e1b14834a36a1d8cda5174d17a0?sid=5f6c93ae-ea47-4d01-a459-f229572ec71a)
+
+## Setup
 
 Run the following in your terminal from the repo, to install `premia`
 
