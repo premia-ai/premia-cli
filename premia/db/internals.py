@@ -60,8 +60,8 @@ def pad(value: str, width: int, fill_string=" ") -> str:
 
 
 def tables() -> list[str]:
-    conn = migration.connect()
-    conn.execute(
+    con = migration.connect()
+    con.execute(
         """
 SELECT table_name
 FROM information_schema.tables
@@ -69,15 +69,15 @@ WHERE table_name != 'schema_migrations'
 ORDER BY table_name;
 """
     )
-    result = cast(list[tuple[str]], conn.fetchall())
+    result = cast(list[tuple[str]], con.fetchall())
     return [table for table, in result]
 
 
 def inspect() -> str:
-    conn = migration.connect()
+    con = migration.connect()
 
     parsed_tables = {}
-    with conn.cursor() as cursor:
+    with con.cursor() as cursor:
         cursor.execute(table_query)
 
         for row in cursor.fetchall():

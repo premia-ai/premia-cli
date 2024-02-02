@@ -4,8 +4,8 @@ from datetime import datetime
 
 
 class InstrumentType(Enum):
-    Stocks = "stocks"
-    Options = "options"
+    STOCKS = "stocks"
+    OPTIONS = "options"
 
 
 class Timespan(Enum):
@@ -15,14 +15,13 @@ class Timespan(Enum):
     DAY = "day"
     WEEK = "week"
     MONTH = "month"
-    QUARTER = "quarter"
-    YEAR = "year"
 
 
 @dataclass
 class TimespanInfo:
     one_letter_code: str
-    twelvedata: str | None
+    twelvedata_code: str | None
+    yfinance_code: str | None
     unit: str
     bigger_units: list[str]
 
@@ -30,46 +29,59 @@ class TimespanInfo:
 timespan_info: dict[str, TimespanInfo] = {
     Timespan.SECOND.value: TimespanInfo(
         one_letter_code="s",
-        twelvedata=None,
+        twelvedata_code=None,
+        yfinance_code=None,
         unit=Timespan.SECOND.value,
         bigger_units=[
             Timespan.MINUTE.value,
             Timespan.HOUR.value,
             Timespan.DAY.value,
             Timespan.WEEK.value,
+            Timespan.MONTH.value,
         ],
     ),
     Timespan.MINUTE.value: TimespanInfo(
         one_letter_code="m",
-        twelvedata="min",
+        twelvedata_code="min",
+        yfinance_code="m",
         unit=Timespan.MINUTE.value,
         bigger_units=[
             Timespan.HOUR.value,
             Timespan.DAY.value,
             Timespan.WEEK.value,
+            Timespan.MONTH.value,
         ],
     ),
     Timespan.HOUR.value: TimespanInfo(
         one_letter_code="h",
-        twelvedata="h",
+        twelvedata_code="h",
+        yfinance_code="h",
         unit=Timespan.HOUR.value,
         bigger_units=[
             Timespan.DAY.value,
             Timespan.WEEK.value,
+            Timespan.MONTH.value,
         ],
     ),
     Timespan.DAY.value: TimespanInfo(
         one_letter_code="d",
-        twelvedata="day",
-        unit="day",
-        bigger_units=[
-            Timespan.WEEK.value,
-        ],
+        twelvedata_code="day",
+        yfinance_code="d",
+        unit=Timespan.DAY.value,
+        bigger_units=[Timespan.WEEK.value, Timespan.MONTH.value],
     ),
     Timespan.WEEK.value: TimespanInfo(
         one_letter_code="w",
-        twelvedata="week",
-        unit="week",
+        twelvedata_code="week",
+        yfinance_code="wk",
+        unit=Timespan.WEEK.value,
+        bigger_units=[Timespan.MONTH.value],
+    ),
+    Timespan.MONTH.value: TimespanInfo(
+        one_letter_code="M",
+        twelvedata_code="month",
+        yfinance_code="mo",
+        unit=Timespan.MONTH.value,
         bigger_units=[],
     ),
 }
@@ -88,9 +100,10 @@ market_data_column_names = [
 
 
 class DataProvider(Enum):
-    Polygon = "polygon.io"
-    TwelveData = "twelvedata.com"
-    Csv = "csv"
+    POLYGON = "polygon.io"
+    TWELVE_DATA = "twelvedata.com"
+    CSV = "csv"
+    YFINANCE = "yfinance"
 
 
 @dataclass
@@ -114,6 +127,52 @@ class MarketDataRow:
     volume: str
     currency: str
     data_provider: str
+
+
+@dataclass
+class OptionSymbol:
+    symbol: str
+    expiration_date: datetime
+    contract_type: str
+    underlying_ticker: str
+    strike_price: float
+
+    @classmethod
+    def parse(cls, symbol: str):
+        # Length of the expiration date and strike price parts are fixed
+        # Ticker can be flexible in size
+        expiration_date_length = 6  # YYMMDD
+        contract_length = 1  # C/P
+        strike_price_length = 8  # 00000.000
+
+        expiration_date_part = symbol[
+            -(
+                expiration_date_length + contract_length + strike_price_length
+            ) : -(contract_length + strike_price_length)
+        ]
+        contract_type_part = symbol[
+            -(contract_length + strike_price_length) : -strike_price_length
+        ]
+        strike_price_part = symbol[-strike_price_length:]
+
+        # The remaining part of the symbol is the ticker
+        underlying_ticker = symbol[
+            : -(expiration_date_length + contract_length + strike_price_length)
+        ]
+
+        expiration_date = datetime.fromisoformat(
+            f"20{expiration_date_part[:2]}-{expiration_date_part[2:4]}-{expiration_date_part[4:6]}"
+        )
+        contract_type = "call" if contract_type_part == "C" else "put"
+        strike_price = float(strike_price_part) / 1000
+
+        return cls(
+            symbol=symbol,
+            underlying_ticker=underlying_ticker,
+            expiration_date=expiration_date,
+            contract_type=contract_type,
+            strike_price=strike_price,
+        )
 
 
 class ConfigError(Exception):

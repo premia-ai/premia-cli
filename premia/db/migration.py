@@ -7,8 +7,8 @@ def connect() -> duckdb.DuckDBPyConnection:
     return duckdb.connect(config.db_path())
 
 
-def setup(conn: duckdb.DuckDBPyConnection) -> None:
-    with conn.cursor() as cursor:
+def setup(con: duckdb.DuckDBPyConnection) -> None:
+    with con.cursor() as cursor:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -17,12 +17,12 @@ def setup(conn: duckdb.DuckDBPyConnection) -> None:
             );
         """
         )
-        conn.commit()
+        con.commit()
 
 
-def apply(conn: duckdb.DuckDBPyConnection, file_path: str) -> None:
+def apply(con: duckdb.DuckDBPyConnection, file_path: str) -> None:
     version = get_migration_version(os.path.basename(file_path))
-    with conn.cursor() as cursor:
+    with con.cursor() as cursor:
         with open(file_path, "r") as file:
             sql = file.read()
             try:
@@ -35,23 +35,23 @@ def apply(conn: duckdb.DuckDBPyConnection, file_path: str) -> None:
                 """,
                     [version],
                 )
-                conn.commit()
+                con.commit()
             except Exception as e:
-                # conn.rollback()
+                # con.rollback()
                 raise types.MigrationError(
                     f"Error applying migration {file_path}: {e}"
                 )
 
 
-def apply_all(conn: duckdb.DuckDBPyConnection, directory: str) -> None:
+def apply_all(con: duckdb.DuckDBPyConnection, directory: str) -> None:
     """
     Apply all migrations in the specified directory that are newer than the last applied migration.
 
-    :param conn: Database connection
+    :param con: Database connection
     :param directory: Directory containing migration files
     """
 
-    with conn.cursor() as cursor:
+    with con.cursor() as cursor:
         cursor.execute(
             """
             SELECT version
@@ -72,7 +72,7 @@ def apply_all(conn: duckdb.DuckDBPyConnection, directory: str) -> None:
     for filename in migration_files:
         version = get_migration_version(filename)
         if last_applied_version is None or version > last_applied_version:
-            apply(conn, os.path.join(directory, filename))
+            apply(con, os.path.join(directory, filename))
 
 
 def reset() -> None:
@@ -85,19 +85,17 @@ def reset() -> None:
                 f"An error occurred while deleting the DB at '{db_path}': {e}"
             )
 
-    conn = connect()
-    setup(conn)
+    con = connect()
+    setup(con)
 
 
-def copy_csv(
-    conn: duckdb.DuckDBPyConnection, csv_path: str, table: str
-) -> None:
+def copy_csv(con: duckdb.DuckDBPyConnection, csv_path: str, table: str) -> None:
     """
     Copy the contents of a CSV file to the designated PostgreSQL table.
     """
-    with conn.cursor() as cursor:
+    with con.cursor() as cursor:
         cursor.sql(f"COPY {table} FROM '{csv_path}' DELIMITER ',' CSV HEADER;")
-        conn.commit()
+        con.commit()
 
 
 def get_migration_version(filename: str) -> str:

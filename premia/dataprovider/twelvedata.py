@@ -20,15 +20,15 @@ accepted_timespans = [
 
 def import_market_data(api_params: types.ApiParams):
     # TODO: Move the connect function to another module
-    conn = migration.connect()
+    con = migration.connect()
 
     market_data_rows = get_aggregates(api_params)
     rows_df = pd.DataFrame([asdict(row) for row in market_data_rows])
-    conn = migration.connect()
+    con = migration.connect()
 
     try:
         rows_df.to_sql(
-            api_params.table, con=conn, if_exists="append", index=False
+            api_params.table, con=con, if_exists="append", index=False
         )
     except Exception as e:
         raise types.DataImportError(
@@ -48,7 +48,7 @@ def get_aggregates(api_params: types.ApiParams):
             f"Timespan '{api_params.timespan_unit}' is not supported by twelvedata"
         )
 
-    timespan = types.timespan_info[api_params.timespan_unit].twelvedata
+    timespan = types.timespan_info[api_params.timespan_unit].twelvedata_code
     interval = f"{api_params.quantity}{timespan}"
 
     query = {
@@ -89,7 +89,7 @@ def convert_to_market_data_rows(data: Any) -> list[types.MarketDataRow]:
                 low=time_series_value["low"],
                 volume=time_series_value["volume"],
                 currency=data["meta"]["currency"],
-                data_provider=types.DataProvider.TwelveData.value,
+                data_provider=types.DataProvider.TWELVE_DATA.value,
             )
         )
     return candles

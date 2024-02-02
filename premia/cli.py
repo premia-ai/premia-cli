@@ -23,25 +23,25 @@ def ai():
 @ai.command("init")
 @click.option("-f", "--force", default=False, is_flag=True)
 @click.option(
-    "-n",
-    "--name",
+    "-r",
+    "--repo",
     help="The name of a model's huggingface repo (including the username)",
 )
 @click.option(
     "-f", "--file", help="The file name inside the repo you want to download"
 )
-def ai_init(force: bool, name: str, file: str):
+def ai_init(force: bool, repo: str, file: str):
     """Initialize an open source LLM on your machine."""
 
-    if (name and not file) or (file and not name):
+    if (repo and not file) or (file and not repo):
         click.secho(
-            "Error: You need to define both a name and a file",
+            "Error: You need to define both a repo and a file",
             err=True,
             fg="red",
         )
         raise click.Abort()
 
-    model.init(force=force, model_name=name, model_file=file)
+    model.init(force=force, model_repo=repo, model_file=file)
 
 
 @ai.command()
@@ -135,15 +135,15 @@ def db_import():
 @db.command()
 @click.argument("table_name")
 def show(table_name: str):
-    conn = migration.connect()
-    conn.sql(f"FROM {table_name};").show()
+    con = migration.connect()
+    con.sql(f"FROM {table_name};").show()
 
 
 @db.command("add")
 @click.argument(
     "instrument_type",
     type=click.Choice(
-        [types.InstrumentType.Stocks.value, types.InstrumentType.Options.value]
+        [types.InstrumentType.STOCKS.value, types.InstrumentType.OPTIONS.value]
     ),
 )
 def db_add(instrument_type: str):

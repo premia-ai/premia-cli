@@ -15,8 +15,6 @@ accepted_timespans = [
     types.Timespan.DAY.value,
     types.Timespan.WEEK.value,
     types.Timespan.MONTH.value,
-    types.Timespan.QUARTER.value,
-    types.Timespan.YEAR.value,
 ]
 
 
@@ -35,7 +33,7 @@ def map_agg_to_market_data_row(
         low=str(agg.low),
         volume=str(int(agg.volume)) if agg.volume else "",
         currency="USD",
-        data_provider=types.DataProvider.Polygon.value,
+        data_provider=types.DataProvider.POLYGON.value,
     )
 
 
@@ -65,15 +63,15 @@ def import_market_data(api_params: types.ApiParams) -> None:
         map_agg_to_market_data_row(api_params.ticker[0], agg) for agg in aggs
     ]
     rows_df = pd.DataFrame([asdict(row) for row in market_data_rows])
-    conn = migration.connect()
+    con = migration.connect()
 
     try:
         rows_df.to_sql(
-            api_params.table, con=conn, if_exists="append", index=False
+            api_params.table, con=con, if_exists="append", index=False
         )
     except Exception as e:
         raise types.DataImportError(
             f"Failed to copy polygon.io data to table '{api_params.table}': {e}"
         )
 
-    conn.close()
+    con.close()

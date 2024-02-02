@@ -5,7 +5,7 @@ from premia.db import migration
 
 
 def execute_completion(completion: str):
-    conn = migration.connect()
+    con = migration.connect()
     sql_fence_pattern = r"```sql([\s\S]*?)```"
     sql_commands = re.findall(sql_fence_pattern, completion, re.DOTALL)
 
@@ -14,7 +14,7 @@ def execute_completion(completion: str):
 
     if click.confirm("Do you want to execute the suggested SQL command?"):
         try:
-            relation = conn.sql(sql_commands[0].strip())
+            relation = con.sql(sql_commands[0].strip())
             relation.show()
             if click.confirm(
                 "Do you want to store this result for further questions?"

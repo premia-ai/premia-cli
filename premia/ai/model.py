@@ -24,8 +24,6 @@ REMOTE_SYSTEM_PROMPT_TEMPLATE = """
 DuckDB SQL-database schema:
 ```sql
 {db_schema}
-
--- contract_type: 'call' or 'put'
 ```
 You are an SQL assistant.
 
@@ -39,11 +37,11 @@ Only include tables, views and columns specified in the mentioned database schem
 
 def init(
     force=False,
-    model_name="TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
+    model_repo="TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
     model_file="mistral-7b-instruct-v0.2.Q4_K_M.gguf",
 ) -> str:
     model_path = hf_hub_download(
-        model_name, filename=model_file, force_download=force
+        model_repo, filename=model_file, force_download=force
     )
     return model_path
 

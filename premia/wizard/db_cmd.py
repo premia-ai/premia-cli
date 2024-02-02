@@ -1,18 +1,19 @@
 import click
 import os
-from premia.dataprovider import twelvedata, polygon
+from premia.dataprovider import twelvedata, polygon, yfinance
 from premia.utils import config, types
 from premia.db import template, migration
 
 providers_per_instrument = {
-    types.InstrumentType.Stocks.value: [
-        types.DataProvider.Polygon.value,
-        types.DataProvider.TwelveData.value,
-        types.DataProvider.Csv.value,
+    types.InstrumentType.STOCKS.value: [
+        types.DataProvider.YFINANCE.value,
+        types.DataProvider.POLYGON.value,
+        types.DataProvider.TWELVE_DATA.value,
+        types.DataProvider.CSV.value,
     ],
-    types.InstrumentType.Options.value: [
-        types.DataProvider.Polygon.value,
-        types.DataProvider.Csv.value,
+    types.InstrumentType.OPTIONS.value: [
+        types.DataProvider.POLYGON.value,
+        types.DataProvider.CSV.value,
     ],
 }
 
@@ -24,8 +25,8 @@ def setup() -> None:
         "Which instruments do you want to store?",
         type=click.Choice(
             [
-                types.InstrumentType.Stocks.value,
-                types.InstrumentType.Options.value,
+                types.InstrumentType.STOCKS.value,
+                types.InstrumentType.OPTIONS.value,
                 "both",
                 "none",
             ]
@@ -35,15 +36,15 @@ def setup() -> None:
     if answer == "none":
         return
 
-    if answer == types.InstrumentType.Stocks.value or answer == "both":
-        add_instrument_migrations(types.InstrumentType.Stocks)
+    if answer == types.InstrumentType.STOCKS.value or answer == "both":
+        add_instrument_migrations(types.InstrumentType.STOCKS)
 
-    if answer == types.InstrumentType.Options.value or answer == "both":
-        add_instrument_migrations(types.InstrumentType.Options)
+    if answer == types.InstrumentType.OPTIONS.value or answer == "both":
+        add_instrument_migrations(types.InstrumentType.OPTIONS)
 
-    conn = migration.connect()
-    migration.setup(conn)
-    migration.apply_all(conn, migrations_dir)
+    con = migration.connect()
+    migration.setup(con)
+    migration.apply_all(con, migrations_dir)
 
 
 def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
@@ -68,9 +69,9 @@ def add_instrument_migrations(instrument_type: types.InstrumentType) -> None:
 
     template.create_migration_file("add_candles", data)
 
-    if instrument_type == types.InstrumentType.Stocks:
+    if instrument_type == types.InstrumentType.STOCKS:
         template.create_migration_file("add_companies")
-    elif instrument_type == types.InstrumentType.Options:
+    elif instrument_type == types.InstrumentType.OPTIONS:
         template.create_migration_file("add_contracts")
 
     response = click.prompt(
@@ -141,8 +142,8 @@ def seed():
         "Do you want to import data?",
         type=click.Choice(
             [
-                types.InstrumentType.Stocks.value,
-                types.InstrumentType.Options.value,
+                types.InstrumentType.STOCKS.value,
+                types.InstrumentType.OPTIONS.value,
                 "both",
                 "no",
             ]
@@ -151,10 +152,10 @@ def seed():
 
     if response == "no":
         return
-    if response == types.InstrumentType.Stocks.value or response == "both":
-        import_data(types.InstrumentType.Stocks.value)
-    if response == types.InstrumentType.Options.value or response == "both":
-        import_data(types.InstrumentType.Options.value)
+    if response == types.InstrumentType.STOCKS.value or response == "both":
+        import_data(types.InstrumentType.STOCKS.value)
+    if response == types.InstrumentType.OPTIONS.value or response == "both":
+        import_data(types.InstrumentType.OPTIONS.value)
 
 
 def import_data(
@@ -170,11 +171,13 @@ def import_data(
         provider = providers[0]
 
     try:
-        if provider == types.DataProvider.Polygon.value:
+        if provider == types.DataProvider.POLYGON.value:
             import_from_polygon(instrument_type)
-        elif provider == types.DataProvider.TwelveData.value:
+        elif provider == types.DataProvider.TWELVE_DATA.value:
             import_from_twelvedata()
-        elif provider == types.DataProvider.Csv.value:
+        elif provider == types.DataProvider.YFINANCE.value:
+            import_from_yfinance()
+        elif provider == types.DataProvider.CSV.value:
             import_from_csv(instrument_type)
         else:
             raise types.WizardError(f"Unsupported data provider: {provider}")
@@ -188,14 +191,14 @@ def import_from_csv(instrument_type: str):
     )
 
     instrument_config = config.config().instruments[instrument_type]
-    conn = migration.connect()
+    con = migration.connect()
     migration.copy_csv(
-        conn,
+        con,
         os.path.expanduser(candles_csv_path),
         instrument_config.base_table,
     )
 
-    if instrument_type == types.InstrumentType.Options.value:
+    if instrument_type == types.InstrumentType.OPTIONS.value:
         metadata_table = "contracts"
     else:
         metadata_table = "companies"
@@ -205,12 +208,13 @@ def import_from_csv(instrument_type: str):
     )
 
     migration.copy_csv(
-        conn,
+        con,
         os.path.expanduser(metadata_csv_path),
         metadata_table,
     )
 
 
+# TODO: Simplify the import_from... functions, lots of duplication.
 def import_from_twelvedata():
     ticker = click.prompt(
         "What's the ticker of the instrument you would like to download?"
@@ -227,10 +231,41 @@ def import_from_twelvedata():
 
     config_file_data = config.config()
     stocks_config = config_file_data.instruments[
-        types.InstrumentType.Stocks.value
+        types.InstrumentType.STOCKS.value
     ]
 
     twelvedata.import_market_data(
+        types.ApiParams(
+            ticker=ticker,
+            timespan_unit=stocks_config.timespan_unit,
+            quantity=1,
+            start=start,
+            end=end,
+            table=stocks_config.base_table,
+        )
+    )
+
+
+def import_from_yfinance():
+    ticker = click.prompt(
+        "What's the ticker of the instrument you would like to download?"
+    )
+
+    start = click.prompt(
+        "What should the start date of the entries be?",
+        type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
+    )
+    end = click.prompt(
+        "What should the end date of the entries be?",
+        type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
+    )
+
+    config_file_data = config.config()
+    stocks_config = config_file_data.instruments[
+        types.InstrumentType.STOCKS.value
+    ]
+
+    yfinance.import_market_data(
         types.ApiParams(
             ticker=ticker,
             timespan_unit=stocks_config.timespan_unit,
@@ -268,7 +303,7 @@ def import_from_polygon(instrument: str):
     )
 
     # TODO: Migrate Polygon's metadata import
-    # if instrument == config.Stocks:
+    # if instrument == config.STOCKS:
     #     polygon.import_company_data(ticker)
-    # elif instrument == config.Options:
+    # elif instrument == config.OPTIONS:
     #     polygon.import_contract_data(ticker)
