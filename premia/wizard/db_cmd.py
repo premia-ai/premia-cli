@@ -263,7 +263,7 @@ def import_from_twelvedata():
     twelvedata.import_market_data(
         types.ApiParams(
             ticker=ticker,
-            timespan_unit=stocks_config.timespan_unit,
+            timespan=types.Timespan(stocks_config.timespan_unit),
             quantity=1,
             start=start,
             end=end,
@@ -290,7 +290,7 @@ def import_from_yfinance():
     yfinance.import_market_data(
         types.ApiParams(
             ticker=ticker,
-            timespan_unit=stocks_config.timespan_unit,
+            timespan=types.Timespan(stocks_config.timespan_unit),
             quantity=1,
             start=start,
             end=end,
@@ -318,7 +318,7 @@ def import_from_polygon(instrument: types.InstrumentType):
             ticker=ticker,
             start=start,
             end=end,
-            timespan_unit=instrument_config.timespan_unit,
+            timespan=types.Timespan(instrument_config.timespan_unit),
             quantity=1,
             table=instrument_config.base_table,
         )

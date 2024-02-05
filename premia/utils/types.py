@@ -109,7 +109,7 @@ class DataProvider(Enum):
 @dataclass
 class ApiParams:
     ticker: str
-    timespan_unit: str
+    timespan: Timespan
     quantity: int
     start: datetime
     end: datetime

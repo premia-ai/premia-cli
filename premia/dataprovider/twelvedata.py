@@ -10,11 +10,11 @@ from premia.db import migration
 
 
 accepted_timespans = [
-    types.Timespan.MINUTE.value,
-    types.Timespan.HOUR.value,
-    types.Timespan.DAY.value,
-    types.Timespan.WEEK.value,
-    types.Timespan.MONTH.value,
+    types.Timespan.MINUTE,
+    types.Timespan.HOUR,
+    types.Timespan.DAY,
+    types.Timespan.WEEK,
+    types.Timespan.MONTH,
 ]
 
 
@@ -43,12 +43,12 @@ def get_aggregates(api_params: types.ApiParams):
             "Please set TWELVEDATA_API_KEY environment variable"
         )
 
-    if api_params.timespan_unit not in accepted_timespans:
+    if api_params.timespan not in accepted_timespans:
         raise ValueError(
-            f"Timespan '{api_params.timespan_unit}' is not supported by twelvedata"
+            f"Timespan '{api_params.timespan.value}' is not supported by twelvedata"
         )
 
-    timespan = types.timespan_info[api_params.timespan_unit].twelvedata_code
+    timespan = types.timespan_info[api_params.timespan].twelvedata_code
     interval = f"{api_params.quantity}{timespan}"
 
     query = {

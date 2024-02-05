@@ -9,12 +9,12 @@ from premia.utils import types
 from premia.db import migration
 
 accepted_timespans = [
-    types.Timespan.SECOND.value,
-    types.Timespan.MINUTE.value,
-    types.Timespan.HOUR.value,
-    types.Timespan.DAY.value,
-    types.Timespan.WEEK.value,
-    types.Timespan.MONTH.value,
+    types.Timespan.SECOND,
+    types.Timespan.MINUTE,
+    types.Timespan.HOUR,
+    types.Timespan.DAY,
+    types.Timespan.WEEK,
+    types.Timespan.MONTH,
 ]
 
 
@@ -38,9 +38,9 @@ def map_agg_to_market_data_row(
 
 
 def import_market_data(api_params: types.ApiParams) -> None:
-    if api_params.timespan_unit not in accepted_timespans:
+    if api_params.timespan not in accepted_timespans:
         raise ValueError(
-            f"Timespan '{api_params.timespan_unit}' is not supported by polygon.io"
+            f"Timespan '{api_params.timespan.value}' is not supported by polygon.io"
         )
 
     client = RESTClient(api_key=os.getenv("POLYGON_API_KEY"))
@@ -51,7 +51,7 @@ def import_market_data(api_params: types.ApiParams) -> None:
             client.get_aggs(
                 ticker=api_params.ticker,
                 multiplier=api_params.quantity,
-                timespan=api_params.timespan_unit,
+                timespan=api_params.timespan.value,
                 from_=api_params.start,
                 to=api_params.end,
             ),
