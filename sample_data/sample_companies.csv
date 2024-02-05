@@ -1,8 +1,8 @@
-shortName,symbol,industry,sector,country
-"Amazon.com, Inc.",AMZN,Internet Retail,Consumer Cyclical,United States
-Alphabet Inc.,GOOG,Internet Content & Information,Communication Services,United States
-NVIDIA Corporation,NVDA,Semiconductors,Technology,United States
-"Tesla, Inc.",TSLA,Auto Manufacturers,Consumer Cyclical,United States
-"Meta Platforms, Inc.",META,Internet Content & Information,Communication Services,United States
-Apple Inc.,AAPL,Consumer Electronics,Technology,United States
-Microsoft Corporation,MSFT,Software - Infrastructure,Technology,United States
+symbol,name,industry,sector,country
+AMZN,"Amazon.com, Inc.",Internet Retail,Consumer Cyclical,United States
+GOOG,Alphabet Inc.,Internet Content & Information,Communication Services,United States
+NVDA,NVIDIA Corporation,Semiconductors,Technology,United States
+TSLA,"Tesla, Inc.",Auto Manufacturers,Consumer Cyclical,United States
+META,"Meta Platforms, Inc.",Internet Content & Information,Communication Services,United States
+AAPL,Apple Inc.,Consumer Electronics,Technology,United States
+MSFT,Microsoft Corporation,Software - Infrastructure,Technology,United States

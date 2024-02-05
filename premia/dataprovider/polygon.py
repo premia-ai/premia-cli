@@ -19,14 +19,14 @@ accepted_timespans = [
 
 
 def map_agg_to_market_data_row(
-    ticker: str, agg: models.Agg
+    symbol: str, agg: models.Agg
 ) -> types.MarketDataRow:
     if agg.timestamp is None:
         raise ValueError(f"Entry needs to have a timestamp: {agg}")
 
     return types.MarketDataRow(
         time=datetime.fromtimestamp(float(agg.timestamp / 1000)),
-        symbol=ticker,
+        symbol=symbol,
         open=str(agg.open),
         close=str(agg.close),
         high=str(agg.high),
@@ -49,7 +49,7 @@ def import_market_data(api_params: types.ApiParams) -> None:
         aggs = cast(
             list[models.Agg],
             client.get_aggs(
-                ticker=api_params.ticker,
+                ticker=api_params.symbol,
                 multiplier=api_params.quantity,
                 timespan=api_params.timespan.value,
                 from_=api_params.start,
@@ -60,7 +60,7 @@ def import_market_data(api_params: types.ApiParams) -> None:
         raise types.DataImportError(e)
 
     market_data_rows = [
-        map_agg_to_market_data_row(api_params.ticker[0], agg) for agg in aggs
+        map_agg_to_market_data_row(api_params.symbol[0], agg) for agg in aggs
     ]
     rows_df = pd.DataFrame([asdict(row) for row in market_data_rows])
     con = migration.connect()

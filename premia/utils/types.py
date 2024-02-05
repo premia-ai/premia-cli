@@ -108,7 +108,7 @@ class DataProvider(Enum):
 
 @dataclass
 class ApiParams:
-    ticker: str
+    symbol: str
     timespan: Timespan
     quantity: int
     start: datetime
@@ -140,7 +140,7 @@ class OptionSymbol:
     @classmethod
     def parse(cls, symbol: str):
         # Length of the expiration date and strike price parts are fixed
-        # Ticker can be flexible in size
+        # Symbol can be flexible in size
         expiration_date_length = 6  # YYMMDD
         contract_length = 1  # C/P
         strike_price_length = 8  # 00000.000

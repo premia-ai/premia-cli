@@ -28,7 +28,7 @@ def import_market_data(api_params: types.ApiParams):
     timespan = types.timespan_info[api_params.timespan].yfinance_code
     interval = f"{api_params.quantity}{timespan}"
 
-    ticker = yf.Ticker([api_params.ticker])
+    ticker = yf.Ticker([api_params.symbol])
     ticker_history = ticker.history(
         end=api_params.end.strftime("%Y-%m-%d"),
         start=api_params.start.strftime("%Y-%m-%d"),
@@ -41,6 +41,7 @@ def import_market_data(api_params: types.ApiParams):
         .reset_index(level=1)
         .drop(columns=["Dividends", "Stock Splits"])
         .rename(columns=str.lower)
+        .rename(columns={"ticker": "symbol"})
         .rename_axis("time")
     )
 

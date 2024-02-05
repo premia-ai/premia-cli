@@ -54,7 +54,7 @@ def get_aggregates(api_params: types.ApiParams):
     query = {
         "apikey": api_key,
         "interval": interval,
-        "symbol": api_params.ticker,
+        "symbol": api_params.symbol,
         "start_date": api_params.start.strftime("%Y-%m-%d %H:%M:%S"),
         "end_date": api_params.end.strftime("%Y-%m-%d %H:%M:%S"),
         "timezone": "UTC",

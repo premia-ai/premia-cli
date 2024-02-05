@@ -246,8 +246,8 @@ What is the path to your {metadata_table}' CSV file?
 
 # TODO: Simplify the import_from... functions, lots of duplication.
 def import_from_twelvedata():
-    ticker = click.prompt(
-        "What's the ticker of the instrument you would like to download?"
+    symbol = click.prompt(
+        "What's the symbol of the instrument you would like to download?"
     )
 
     start = click.prompt(
@@ -262,7 +262,7 @@ def import_from_twelvedata():
     stocks_config = config.config().instruments[types.InstrumentType.STOCKS]
     twelvedata.import_market_data(
         types.ApiParams(
-            ticker=ticker,
+            symbol=symbol,
             timespan=types.Timespan(stocks_config.timespan_unit),
             quantity=1,
             start=start,
@@ -289,7 +289,7 @@ def import_from_yfinance():
     stocks_config = config.config().instruments[types.InstrumentType.STOCKS]
     yfinance.import_market_data(
         types.ApiParams(
-            ticker=ticker,
+            symbol=ticker,
             timespan=types.Timespan(stocks_config.timespan_unit),
             quantity=1,
             start=start,
@@ -300,8 +300,8 @@ def import_from_yfinance():
 
 
 def import_from_polygon(instrument: types.InstrumentType):
-    ticker = click.prompt(
-        "What's the ticker of the instrument you would like to download?"
+    symbol = click.prompt(
+        "What's the symbol of the instrument you would like to download?"
     )
     start = click.prompt(
         "What should the start date of the entries be?",
@@ -315,7 +315,7 @@ def import_from_polygon(instrument: types.InstrumentType):
     instrument_config = config.config().instruments[instrument]
     polygon.import_market_data(
         types.ApiParams(
-            ticker=ticker,
+            symbol=symbol,
             start=start,
             end=end,
             timespan=types.Timespan(instrument_config.timespan_unit),
