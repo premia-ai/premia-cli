@@ -47,7 +47,9 @@ class InstrumentConfig:
 class ConfigFileData:
     version: str = "1"
     database: str = "DuckDB"
-    instruments: dict[str, InstrumentConfig] = field(default_factory=dict)
+    instruments: dict[types.InstrumentType, InstrumentConfig] = field(
+        default_factory=dict
+    )
 
     @classmethod
     def from_dict(cls, data_dict: dict) -> "ConfigFileData":
@@ -55,14 +57,14 @@ class ConfigFileData:
         config_file_data.version = data_dict.get("version", "1")
         config_file_data.instruments = data_dict.get("instruments", {})
         config_file_data.instruments = {
-            key: InstrumentConfig(**value)
+            types.InstrumentType(key): InstrumentConfig(**value)
             for key, value in data_dict.get("instruments", {}).items()
         }
         return config_file_data
 
     def to_dict(self) -> dict:
         instruments = {
-            key: value.__dict__.copy()
+            key.value: value.__dict__.copy()
             for key, value in self.instruments.items()
         }
         self_dict = self.__dict__.copy()
@@ -71,12 +73,12 @@ class ConfigFileData:
 
 
 def update_config(
-    instrument_type: types.InstrumentType, data: InstrumentConfig
+    instrument: types.InstrumentType, data: InstrumentConfig
 ) -> None:
     config_file_path = config_file()
     config_file_data = config()
 
-    config_file_data.instruments[instrument_type.value] = data
+    config_file_data.instruments[instrument] = data
 
     with open(config_file_path, "w") as file:
         json.dump(config_file_data.to_dict(), file, indent=2)

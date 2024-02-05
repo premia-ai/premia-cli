@@ -8,14 +8,14 @@ from premia.utils import config, types
 
 @dataclass
 class SqlTemplateData:
-    instrument_type: types.InstrumentType
+    instrument: types.InstrumentType
     quantity: int
     time_unit: str
     reference_table: str = ""
 
     def as_dict(self):
         return {
-            "instrument_type": self.instrument_type.value,
+            "instrument": self.instrument.value,
             "quantity": self.quantity,
             "time_unit": self.time_unit,
             "reference_table": self.reference_table,

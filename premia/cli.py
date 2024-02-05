@@ -150,14 +150,13 @@ def db_add(instrument_type: str):
     """
     Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init` otherwise.
     """
-    config_file_data = config.config()
-
-    if config_file_data.instruments.get(instrument_type):
+    instrument = types.InstrumentType(instrument_type)
+    if config.config().instruments.get(instrument):
         click.secho(
             f"{instrument_type.capitalize()} have already been setup.", fg="red"
         )
         raise click.Abort()
 
-    db_cmd.add_instrument_migrations(types.InstrumentType(instrument_type))
+    db_cmd.add_instrument_migrations(instrument)
     migration.apply_all(migration.connect(), config.migrations_dir())
     click.echo(f"Finished setting up {instrument_type} for your system.")

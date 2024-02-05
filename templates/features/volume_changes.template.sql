@@ -1,4 +1,4 @@
-CREATE OR REPLACE VIEW {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_volume_changes AS
+CREATE OR REPLACE VIEW {{ instrument }}_{{ quantity }}_{{ time_unit }}_volume_changes AS
 SELECT 
     "time", 
     symbol, 

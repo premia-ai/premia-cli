@@ -1,4 +1,4 @@
-CREATE OR REPLACE VIEW {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_averages AS
+CREATE OR REPLACE VIEW {{ instrument }}_{{ quantity }}_{{ time_unit }}_averages AS
 SELECT time, symbol, average
 FROM (
      SELECT

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_candles (
+CREATE TABLE IF NOT EXISTS {{ instrument }}_{{ quantity }}_{{ time_unit }}_candles (
     time TIMESTAMPTZ NOT NULL,
     symbol TEXT NOT NULL,
     open NUMERIC NULL,
@@ -10,5 +10,5 @@ CREATE TABLE IF NOT EXISTS {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_
     data_provider TEXT NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_candles_symbol_time_idx
-ON {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_candles (symbol, time DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS {{ instrument }}_{{ quantity }}_{{ time_unit }}_candles_symbol_time_idx
+ON {{ instrument }}_{{ quantity }}_{{ time_unit }}_candles (symbol, time DESC);

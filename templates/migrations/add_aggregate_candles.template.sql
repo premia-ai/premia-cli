@@ -1,4 +1,4 @@
-CREATE VIEW {{ instrument_type }}_{{ quantity }}_{{ time_unit }}_candles AS
+CREATE VIEW {{ instrument }}_{{ quantity }}_{{ time_unit }}_candles AS
 SELECT
     DATE_TRUNC('{{ time_unit }}', time) as time,
     symbol,
