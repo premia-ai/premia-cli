@@ -188,14 +188,16 @@ def import_data(
 
 
 def import_from_csv(instrument: types.InstrumentType):
+    instrument_config = config.config().instruments[instrument]
+    base_table_columns = migration.columns(instrument_config.base_table)
     candles_csv_path = click.prompt(
-        f"What is the path to your {instrument.value} raw data CSV file?"
+        f"""
+What is the path to your {instrument.value}' 1 {instrument_config.timespan_unit} candles CSV file?
+(The CSV must define the following columns: {', '.join(base_table_columns)})
+        """.strip()
     )
 
-    instrument_config = config.config().instruments[instrument]
-    con = migration.connect()
     migration.copy_csv(
-        con,
         os.path.expanduser(candles_csv_path),
         instrument_config.base_table,
     )
@@ -205,12 +207,15 @@ def import_from_csv(instrument: types.InstrumentType):
     else:
         metadata_table = "companies"
 
+    metadata_table_columns = migration.columns(metadata_table)
     metadata_csv_path = click.prompt(
-        f"What is the path to your {metadata_table} CSV file?"
+        f"""
+What is the path to your {metadata_table}' CSV file?
+(The CSV must define the following columns: {', '.join(metadata_table_columns)})
+        """.strip()
     )
 
     migration.copy_csv(
-        con,
         os.path.expanduser(metadata_csv_path),
         metadata_table,
     )

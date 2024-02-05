@@ -1,10 +1,26 @@
 import os
+from typing import cast
 import duckdb
 from premia.utils import types, config
 
 
 def connect() -> duckdb.DuckDBPyConnection:
     return duckdb.connect(config.db_path())
+
+
+def columns(table_name: str, con=connect()) -> list[str]:
+    with con.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name = ?
+            """,
+            (table_name,),
+        )
+        result = cursor.fetchall()
+        column_names = [column_name for column_name, in result]
+        return cast(list[str], column_names)
 
 
 def setup(con: duckdb.DuckDBPyConnection) -> None:
@@ -89,7 +105,7 @@ def reset() -> None:
     setup(con)
 
 
-def copy_csv(con: duckdb.DuckDBPyConnection, csv_path: str, table: str) -> None:
+def copy_csv(csv_path: str, table: str, con=connect()) -> None:
     """
     Copy the contents of a CSV file to the designated PostgreSQL table.
     """
