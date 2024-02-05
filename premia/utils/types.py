@@ -26,8 +26,8 @@ class TimespanInfo:
     bigger_units: list[str]
 
 
-timespan_info: dict[str, TimespanInfo] = {
-    Timespan.SECOND.value: TimespanInfo(
+timespan_info: dict[Timespan, TimespanInfo] = {
+    Timespan.SECOND: TimespanInfo(
         one_letter_code="s",
         twelvedata_code=None,
         yfinance_code=None,
@@ -40,7 +40,7 @@ timespan_info: dict[str, TimespanInfo] = {
             Timespan.MONTH.value,
         ],
     ),
-    Timespan.MINUTE.value: TimespanInfo(
+    Timespan.MINUTE: TimespanInfo(
         one_letter_code="m",
         twelvedata_code="min",
         yfinance_code="m",
@@ -52,7 +52,7 @@ timespan_info: dict[str, TimespanInfo] = {
             Timespan.MONTH.value,
         ],
     ),
-    Timespan.HOUR.value: TimespanInfo(
+    Timespan.HOUR: TimespanInfo(
         one_letter_code="h",
         twelvedata_code="h",
         yfinance_code="h",
@@ -63,21 +63,21 @@ timespan_info: dict[str, TimespanInfo] = {
             Timespan.MONTH.value,
         ],
     ),
-    Timespan.DAY.value: TimespanInfo(
+    Timespan.DAY: TimespanInfo(
         one_letter_code="d",
         twelvedata_code="day",
         yfinance_code="d",
         unit=Timespan.DAY.value,
         bigger_units=[Timespan.WEEK.value, Timespan.MONTH.value],
     ),
-    Timespan.WEEK.value: TimespanInfo(
+    Timespan.WEEK: TimespanInfo(
         one_letter_code="w",
         twelvedata_code="week",
         yfinance_code="wk",
         unit=Timespan.WEEK.value,
         bigger_units=[Timespan.MONTH.value],
     ),
-    Timespan.MONTH.value: TimespanInfo(
+    Timespan.MONTH: TimespanInfo(
         one_letter_code="M",
         twelvedata_code="month",
         yfinance_code="mo",

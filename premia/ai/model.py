@@ -24,6 +24,7 @@ REMOTE_SYSTEM_PROMPT_TEMPLATE = """
 DuckDB SQL-database schema:
 ```sql
 {db_schema}
+- contact-type: 'call' or 'put'
 ```
 You are an SQL assistant.
 

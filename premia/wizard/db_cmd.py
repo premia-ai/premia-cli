@@ -47,68 +47,74 @@ def setup() -> None:
     migration.apply_all(con, migrations_dir)
 
 
-def add_instrument_migrations(instrument: types.InstrumentType) -> None:
-    timespan_units = [ti.unit for ti in types.timespan_info.values()]
+# TODO: Can we cleaner separate the prompting from the non-prompting flow?
+# TODO: Maybe split the function in smaller sub parts
+def add_instrument_migrations(
+    instrument: types.InstrumentType,
+    timespan: types.Timespan | None = None,
+    allow_prompts=True,
+) -> None:
+    if not timespan and not allow_prompts:
+        raise types.WizardError(
+            "You need to either set a timespan or allow prompts."
+        )
 
-    timespan_unit = click.prompt(
-        "What is the timespan of your data points?",
-        type=click.Choice(timespan_units),
-    )
+    if not timespan:
+        timespan_units = [ti.unit for ti in types.timespan_info.values()]
+        timespan_unit = click.prompt(
+            "What is the timespan of your data points?",
+            type=click.Choice(timespan_units),
+        )
+        timespan = types.Timespan(timespan_unit)
 
-    timespan_info = types.timespan_info.get(timespan_unit)
+    timespan_info = types.timespan_info.get(timespan)
 
     if timespan_info is None:
-        click.echo("Invalid timespan unit selected.")
-        return
+        click.secho("Selected invalid timespan unit.", fg="red")
+        raise click.Abort()
 
-    data = template.SqlTemplateData(
-        instrument=instrument,
-        quantity=1,
-        time_unit=timespan_unit,
+    base_table = f"{instrument.value}_1_{timespan.value}_candles"
+    config.update_config(
+        instrument,
+        config.InstrumentConfig(
+            base_table=base_table,
+            timespan_unit=timespan.value,
+        ),
     )
 
-    template.create_migration_file("add_candles", data)
+    template.create_migration_file(
+        "add_candles",
+        template.SqlTemplateData(
+            instrument=instrument,
+            quantity=1,
+            timespan=timespan,
+        ),
+    )
 
     if instrument == types.InstrumentType.STOCKS:
         template.create_migration_file("add_companies")
     elif instrument == types.InstrumentType.OPTIONS:
         template.create_migration_file("add_contracts")
 
+    if not allow_prompts:
+        return
+
     response = click.prompt(
         f"Do you want to create an aggregate based on your {instrument.value}' raw data?",
         type=click.Choice(timespan_info.bigger_units + ["no"]),
     )
-
-    base_table = f"{instrument.value}_1_{timespan_unit}_candles"
-
-    config.update_config(
-        instrument,
-        config.InstrumentConfig(
-            base_table=base_table,
-            timespan_unit=timespan_unit,
-        ),
-    )
-
     if response != "no":
-        aggregate_timespan_info = next(
-            (
-                timespan_info
-                for timespan_info in types.timespan_info.values()
-                if timespan_info.unit == response
-            ),
-            None,
-        )
-
-        if aggregate_timespan_info is None:
+        aggregate_timespan = types.Timespan(response)
+        if aggregate_timespan is None:
             click.secho("Invalid aggregate timespan unit selected.", fg="red")
-            return
+            raise click.Abort()
 
         template.create_migration_file(
             "add_aggregate_candles",
             template.SqlTemplateData(
                 instrument=instrument,
                 quantity=1,
-                time_unit=aggregate_timespan_info.unit,
+                timespan=aggregate_timespan,
                 reference_table=base_table,
             ),
         )
@@ -125,7 +131,7 @@ def add_instrument_migrations(instrument: types.InstrumentType) -> None:
             template.SqlTemplateData(
                 instrument=instrument,
                 quantity=1,
-                time_unit=timespan_unit,
+                timespan=timespan,
                 reference_table=base_table,
             ),
         )
@@ -187,8 +193,32 @@ def import_data(
         raise types.WizardError(e)
 
 
-def import_from_csv(instrument: types.InstrumentType):
+def import_from_csv(
+    instrument: types.InstrumentType,
+    candles_csv_path="",
+    metadata_csv_path="",
+    allow_prompts=True,
+):
     instrument_config = config.config().instruments[instrument]
+    metadata_table = (
+        "contracts" if types.InstrumentType.OPTIONS else "companies"
+    )
+
+    if not candles_csv_path and not metadata_csv_path and not allow_prompts:
+        raise types.WizardError(
+            "You need to either set CSV paths for candles and metadata or allow prompts."
+        )
+    elif candles_csv_path and metadata_csv_path:
+        migration.copy_csv(
+            os.path.expanduser(candles_csv_path),
+            instrument_config.base_table,
+        )
+        migration.copy_csv(
+            os.path.expanduser(metadata_csv_path),
+            metadata_table,
+        )
+        return
+
     base_table_columns = migration.columns(instrument_config.base_table)
     candles_csv_path = click.prompt(
         f"""
@@ -196,16 +226,10 @@ What is the path to your {instrument.value}' 1 {instrument_config.timespan_unit}
 (The CSV must define the following columns: {', '.join(base_table_columns)})
         """.strip()
     )
-
     migration.copy_csv(
         os.path.expanduser(candles_csv_path),
         instrument_config.base_table,
     )
-
-    if instrument == types.InstrumentType.OPTIONS:
-        metadata_table = "contracts"
-    else:
-        metadata_table = "companies"
 
     metadata_table_columns = migration.columns(metadata_table)
     metadata_csv_path = click.prompt(
@@ -214,7 +238,6 @@ What is the path to your {metadata_table}' CSV file?
 (The CSV must define the following columns: {', '.join(metadata_table_columns)})
         """.strip()
     )
-
     migration.copy_csv(
         os.path.expanduser(metadata_csv_path),
         metadata_table,

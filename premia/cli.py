@@ -7,7 +7,7 @@ from premia.utils import config, types
 from premia.wizard import db_cmd, ai_cmd
 
 
-@click.version_option("0.0.1", prog_name="premia")
+@click.version_option("0.0.2", prog_name="premia")
 @click.group()
 def cli():
     """A cli to setup, manage and interact with financial data infrastructure."""
@@ -139,24 +139,112 @@ def show(table_name: str):
     con.sql(f"FROM {table_name};").show()
 
 
-@db.command("add")
-@click.argument(
-    "instrument_type",
-    type=click.Choice(
-        [types.InstrumentType.STOCKS.value, types.InstrumentType.OPTIONS.value]
-    ),
-)
-def db_add(instrument_type: str):
+@db.group("add")
+def db_add():
     """
     Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init` otherwise.
     """
-    instrument = types.InstrumentType(instrument_type)
+    pass
+
+
+@db_add.command("stocks")
+@click.option(
+    "-f",
+    "--frequency",
+    help="The frequency the candle data has.",
+    default=None,
+    type=click.Choice(
+        [
+            types.Timespan.SECOND.value,
+            types.Timespan.MINUTE.value,
+            types.Timespan.HOUR.value,
+            types.Timespan.DAY.value,
+        ]
+    ),
+)
+@click.option(
+    "--candles-path",
+    default=None,
+    help="File path for the stock candles data stored in a CSV to seed the new table.",
+)
+@click.option(
+    "--companies-path",
+    default=None,
+    help="File path for the company data stored in a CSV to seed the new table.",
+)
+def add_stocks(
+    frequency: str | None, candles_path: str | None, companies_path: str | None
+):
+    """
+    Add database tables for stocks.
+    """
+    add_instrument(
+        types.InstrumentType.STOCKS, frequency, candles_path, companies_path
+    )
+
+
+@db_add.command("options")
+@click.option(
+    "-f",
+    "--frequency",
+    help="The frequency the candle data has.",
+    default=None,
+    type=click.Choice(
+        [
+            types.Timespan.SECOND.value,
+            types.Timespan.MINUTE.value,
+            types.Timespan.HOUR.value,
+            types.Timespan.DAY.value,
+        ]
+    ),
+)
+@click.option(
+    "--candles-path",
+    default=None,
+    help="File path for the option candles data stored in a CSV to seed the new table.",
+)
+@click.option(
+    "--contracts-path",
+    default=None,
+    help="File path for the contract data stored in a CSV to seed the new table.",
+)
+def add_options(
+    frequency: str | None, candles_path: str | None, contracts_path: str | None
+):
+    """
+    Add database tables for options.
+    """
+    add_instrument(
+        types.InstrumentType.OPTIONS, frequency, candles_path, contracts_path
+    )
+
+
+def add_instrument(
+    instrument: types.InstrumentType,
+    frequency: str | None,
+    candles_path: str | None,
+    metadata_path: str | None,
+):
     if config.config().instruments.get(instrument):
         click.secho(
-            f"{instrument_type.capitalize()} have already been setup.", fg="red"
+            f"{instrument.value.capitalize()} have already been setup.",
+            fg="red",
         )
         raise click.Abort()
 
-    db_cmd.add_instrument_migrations(instrument)
+    if frequency:
+        timespan = types.Timespan(frequency)
+    else:
+        timespan = None
+
+    db_cmd.add_instrument_migrations(
+        instrument, timespan, allow_prompts=(not timespan)
+    )
     migration.apply_all(migration.connect(), config.migrations_dir())
-    click.echo(f"Finished setting up {instrument_type} for your system.")
+
+    if candles_path and metadata_path:
+        db_cmd.import_from_csv(instrument, candles_path, metadata_path)
+
+    click.secho(
+        f"Finished setting up {instrument.value} for your system.", fg="green"
+    )
