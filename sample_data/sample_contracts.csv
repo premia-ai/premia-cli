@@ -1,4 +1,4 @@
-symbol,expiration_date,underlying_ticker,contract_type,shares_per_contract,strike_price,currency
+symbol,expiration_date,company_symbol,contract_type,shares_per_contract,strike_price,currency
 AMZN240202C00080000,2024-02-02,AMZN,call,100,80.0,USD
 AMZN240202C00085000,2024-02-02,AMZN,call,100,85.0,USD
 AMZN240202C00090000,2024-02-02,AMZN,call,100,90.0,USD

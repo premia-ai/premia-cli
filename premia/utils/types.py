@@ -134,7 +134,7 @@ class OptionSymbol:
     symbol: str
     expiration_date: datetime
     contract_type: str
-    underlying_ticker: str
+    company_symbol: str
     strike_price: float
 
     @classmethod
@@ -155,8 +155,8 @@ class OptionSymbol:
         ]
         strike_price_part = symbol[-strike_price_length:]
 
-        # The remaining part of the symbol is the ticker
-        underlying_ticker = symbol[
+        # The remaining part of the symbol is the company symbol
+        company_symbol = symbol[
             : -(expiration_date_length + contract_length + strike_price_length)
         ]
 
@@ -168,7 +168,7 @@ class OptionSymbol:
 
         return cls(
             symbol=symbol,
-            underlying_ticker=underlying_ticker,
+            company_symbol=company_symbol,
             expiration_date=expiration_date,
             contract_type=contract_type,
             strike_price=strike_price,
