@@ -134,7 +134,7 @@ def db_import():
 
 @db.command()
 @click.argument("table_name")
-def show(table_name: str):
+def table(table_name: str):
     con = migration.connect()
     con.sql(f"FROM {table_name};").show()
 
