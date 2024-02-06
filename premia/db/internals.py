@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Literal, cast
 from premia.db import migration
 
+DB_SCHEMA = "premia"
+
 
 @dataclass
 class Column:
@@ -48,7 +50,7 @@ LEFT JOIN information_schema.tables AS t
 ON c.table_name = t.table_name
 LEFT JOIN duckdb_views() as v	
 ON c.table_name = v.view_name
-WHERE c.table_name != 'schema_migrations'
+WHERE c.table_schema != 'premia'
 ORDER BY t.table_type, c.table_name, c.ordinal_position;
 """
 
@@ -65,7 +67,7 @@ def tables() -> list[str]:
         """
 SELECT table_name
 FROM information_schema.tables
-WHERE table_name != 'schema_migrations'
+WHERE table_schema != 'premia'
 ORDER BY table_name;
 """
     )

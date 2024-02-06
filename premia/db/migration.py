@@ -27,7 +27,12 @@ def setup(con: duckdb.DuckDBPyConnection) -> None:
     with con.cursor() as cursor:
         cursor.execute(
             """
-            CREATE TABLE IF NOT EXISTS schema_migrations (
+            CREATE SCHEMA premia;
+        """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS premia.schema_migrations (
                 version VARCHAR PRIMARY KEY,
                 applied BOOLEAN NOT NULL DEFAULT FALSE
             );
@@ -45,7 +50,7 @@ def apply(con: duckdb.DuckDBPyConnection, file_path: str) -> None:
                 cursor.execute(sql)
                 cursor.execute(
                     """
-                    INSERT INTO schema_migrations (version, applied)
+                    INSERT INTO premia.schema_migrations (version, applied)
                     VALUES (?, TRUE)
                     ON CONFLICT (version) DO UPDATE SET applied = TRUE;
                 """,
@@ -71,7 +76,7 @@ def apply_all(con: duckdb.DuckDBPyConnection, directory: str) -> None:
         cursor.execute(
             """
             SELECT version
-            FROM schema_migrations
+            FROM premia.schema_migrations
             WHERE applied = TRUE
             ORDER BY version
             DESC LIMIT 1;
