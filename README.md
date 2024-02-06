@@ -4,7 +4,7 @@ Premia is an AI co-pilot to manage financial data systems.
 
 ## Demo
 
-[![Premia Demo](https://cdn.loom.com/sessions/thumbnails/d9c49e1b14834a36a1d8cda5174d17a0-with-play.gif)](https://www.loom.com/share/d9c49e1b14834a36a1d8cda5174d17a0?sid=5f6c93ae-ea47-4d01-a459-f229572ec71a)
+[![Premia Demo](https://cdn.loom.com/sessions/thumbnails/9dad48f3775d4fa0ba76df6e65765cf9-with-play.gif)](https://www.loom.com/embed/9dad48f3775d4fa0ba76df6e65765cf9?sid=0f640b6c-f8f0-4d41-9806-82e8dcee5d86)
 
 ## How can I try it?
 
