@@ -201,7 +201,9 @@ def import_from_csv(
 ):
     instrument_config = config.config().instruments[instrument]
     metadata_table = (
-        "contracts" if types.InstrumentType.OPTIONS else "companies"
+        "contracts"
+        if instrument == types.InstrumentType.OPTIONS
+        else "companies"
     )
 
     if not candles_csv_path and not metadata_csv_path and not allow_prompts:
