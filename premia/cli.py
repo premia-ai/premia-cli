@@ -40,8 +40,10 @@ def ai_init(force: bool, repo: str, file: str):
             fg="red",
         )
         raise click.Abort()
-
-    model.init(force=force, model_repo=repo, model_file=file)
+    elif not repo and not file:
+        model.init(force=force)
+    else:
+        model.init(force=force, model_repo=repo, model_file=file)
 
 
 @ai.command()

@@ -42,7 +42,7 @@ def init(
     model_file="mistral-7b-instruct-v0.2.Q4_K_M.gguf",
 ) -> str:
     model_path = hf_hub_download(
-        model_repo, filename=model_file, force_download=force
+        repo_id=model_repo, filename=model_file, force_download=force
     )
     return model_path
 
