@@ -8,7 +8,11 @@ def connect() -> duckdb.DuckDBPyConnection:
     return duckdb.connect(config.db_path())
 
 
-def columns(table_name: str, con=connect()) -> list[str]:
+def columns(
+    table_name: str, con: duckdb.DuckDBPyConnection | None = None
+) -> list[str]:
+    con = connect() if con is None else con
+
     with con.cursor() as cursor:
         cursor.execute(
             """
@@ -110,10 +114,14 @@ def reset() -> None:
     setup(con)
 
 
-def copy_csv(csv_path: str, table: str, con=connect()) -> None:
+def copy_csv(
+    csv_path: str, table: str, con: duckdb.DuckDBPyConnection | None = None
+) -> None:
     """
     Copy the contents of a CSV file to the designated PostgreSQL table.
     """
+
+    con = connect() if con is None else con
     with con.cursor() as cursor:
         cursor.sql(f"COPY {table} FROM '{csv_path}' DELIMITER ',' CSV HEADER;")
         con.commit()
