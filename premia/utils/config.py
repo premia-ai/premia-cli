@@ -109,7 +109,7 @@ def config_file(create_if_missing=False) -> str:
 
 def setup_config_dir() -> str:
     config_dir_path = config_dir(True)
-    config_file()
+    config_file(True)
     migrations_dir(True)
 
     return config_dir_path
