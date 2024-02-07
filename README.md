@@ -92,6 +92,10 @@ The `schema` command will print your database's schema to stdout.
 
 The `tables` command will print the tables that are visible to Premia's AI to stdout.
 
+#### `table`
+
+The `table` command takes a table name as input and shows a sample of the table's content.
+
 #### `import`
 
 The `import` command allows to import data from common financial dataproviders (polygon.io, twelvedata.com and yfinance) or a CSV file.
