@@ -229,7 +229,7 @@ What is the path to your {instrument.value}' 1 {instrument_config.timespan_unit}
         """.strip()
     )
     migration.copy_csv(
-        os.path.expanduser(candles_csv_path),
+        os.path.expanduser(candles_csv_path.strip()),
         instrument_config.base_table,
     )
 
@@ -241,7 +241,7 @@ What is the path to your {metadata_table}' CSV file?
         """.strip()
     )
     migration.copy_csv(
-        os.path.expanduser(metadata_csv_path),
+        os.path.expanduser(metadata_csv_path.strip()),
         metadata_table,
     )
 
