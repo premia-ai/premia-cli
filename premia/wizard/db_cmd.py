@@ -171,7 +171,7 @@ def import_data(
     if len(providers) > 1:
         providers_str = [provider.value for provider in providers]
         provider_str = click.prompt(
-            "Which method would you like to use to import the data?",
+            f"Which method would you like to use to import the {instrument.value} data?",
             type=click.Choice(providers_str),
         )
         provider = types.DataProvider(provider_str)
