@@ -85,6 +85,20 @@ The `db` command allows to setup or interact with an SQL database for financial 
 
 `init` will set up a DuckDB database structured to store financial data.
 
+#### `setup`
+
+`setup` allows you to connect your DuckDB to Premia or to create a new DuckDB for premia
+
+**Example**
+
+```sh
+# Create a new DB for premia
+premia db setup
+
+# Connect Premia to a DB called `securities.db` in the home directory
+premia db setup --path ~/securities.db
+```
+
 #### `schema`
 
 The `schema` command will print your database's schema to stdout.

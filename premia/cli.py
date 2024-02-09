@@ -101,6 +101,30 @@ def tables():
         raise click.Abort()
 
 
+@db.command("setup")
+@click.option(
+    "-p",
+    "--path",
+    type=str,
+    help="A path to where your database is located",
+)
+def db_setup(path: str):
+    """Connect Premia to a database or create a default database."""
+    if not path:
+        config.update_db_config()
+        migration.connect()
+        click.secho(
+            f"Successfully set up new database at: {config.DEFAULT_DATABASE_PATH}",
+            fg="green",
+        )
+    else:
+        config.update_db_config(path)
+        click.secho(
+            f"Successfully connected to database at: {path}",
+            fg="green",
+        )
+
+
 @db.command("init")
 def db_init():
     """Initialize a financial database."""

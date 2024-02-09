@@ -187,6 +187,12 @@ class DataImportError(Exception):
     pass
 
 
+class DbError(Exception):
+    """Custom exception class for db related errors."""
+
+    pass
+
+
 class MigrationError(Exception):
     """Custom exception class for migration errors."""
 

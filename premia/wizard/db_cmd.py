@@ -19,6 +19,14 @@ providers_per_instrument = {
 
 
 def setup() -> None:
+    if click.confirm("Do you want to set up a new database for Premia?"):
+        config.update_db_config()
+    else:
+        db_path = click.prompt(
+            "What is the path to your existing DuckDB database?"
+        )
+        config.update_db_config(db_path)
+
     migrations_dir = config.migrations_dir(True)
 
     answer = click.prompt(

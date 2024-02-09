@@ -5,7 +5,11 @@ from premia.utils import types, config
 
 
 def connect() -> duckdb.DuckDBPyConnection:
-    return duckdb.connect(config.db_path())
+    db_config = config.config().db
+    if db_config:
+        return duckdb.connect(db_config.path)
+    else:
+        raise types.DbError("Premia has not been connected to a database.")
 
 
 def columns(
@@ -101,14 +105,16 @@ def apply_all(con: duckdb.DuckDBPyConnection, directory: str) -> None:
 
 
 def reset() -> None:
-    db_path = config.db_path()
-    if os.path.exists(db_path):
-        try:
-            os.remove(db_path)
-        except Exception as e:
-            print(
-                f"An error occurred while deleting the DB at '{db_path}': {e}"
-            )
+    db_config = config.config().db
+    if not db_config:
+        raise types.DbError("Premia is not connected to a database.")
+
+    try:
+        os.remove(db_config.path)
+    except Exception as e:
+        print(
+            f"An error occurred while deleting the DB at '{db_config.path}': {e}"
+        )
 
     con = connect()
     setup(con)

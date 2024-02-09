@@ -2,6 +2,7 @@ import os
 import re
 import json
 from dataclasses import dataclass, field
+from typing import Literal
 import shutil
 import click
 from premia.utils import types
@@ -39,12 +40,6 @@ def cache_dir(create_if_missing=False) -> str:
     return get_dir(CACHE_DIR, create_if_missing)
 
 
-def db_path() -> str:
-    return os.path.expanduser(
-        os.getenv("DATABASE_PATH") or DEFAULT_DATABASE_PATH
-    )
-
-
 @dataclass
 class HuggingfaceModelId:
     user: str
@@ -79,6 +74,12 @@ class InstrumentConfig:
 
 
 @dataclass
+class DbConfig:
+    type: Literal["DuckDB"]
+    path: str
+
+
+@dataclass
 class AiConfig(HuggingfaceModelId):
     model_path: str
 
@@ -92,7 +93,7 @@ class AiConfig(HuggingfaceModelId):
 @dataclass
 class ConfigFileData:
     version: str = "1"
-    database: str = "DuckDB"
+    db: DbConfig | None = None
     ai: AiConfig | None = None
     instruments: dict[types.InstrumentType, InstrumentConfig] = field(
         default_factory=dict
@@ -102,6 +103,11 @@ class ConfigFileData:
     def from_dict(cls, data_dict: dict) -> "ConfigFileData":
         config_file_data = cls()
         config_file_data.version = data_dict.get("version", "1")
+
+        db_config_dict = data_dict.get("db")
+        config_file_data.db = (
+            DbConfig(**db_config_dict) if db_config_dict else None
+        )
 
         ai_config_dict = data_dict.get("ai")
         config_file_data.ai = (
@@ -118,6 +124,9 @@ class ConfigFileData:
 
     def to_dict(self) -> dict:
         self_dict = self.__dict__.copy()
+
+        if self.db:
+            self_dict["db"] = self.db.__dict__.copy()
 
         if self.ai:
             self_dict["ai"] = self.ai.__dict__.copy()
@@ -142,7 +151,28 @@ def update_instrument_config(
         json.dump(config_file_data.to_dict(), file, indent=2)
 
 
-# TODO: You should delete the old model when setting a new one
+def update_db_config(path="") -> None:
+    config_file_path = config_file(create_if_missing=True)
+    config_file_data = config()
+
+    if config_file_data.db and not path:
+        click.secho(
+            "You try to update an existing db config without passing a db path. The config will not be updated.",
+            fg="yellow",
+        )
+        return
+
+    if not config_file_data.db:
+        config_file_data.db = DbConfig(
+            type="DuckDB", path=(path or DEFAULT_DATABASE_PATH)
+        )
+    elif config_file_data.db and path:
+        config_file_data.db.path = path
+
+    with open(config_file_path, "w") as file:
+        json.dump(config_file_data.to_dict(), file, indent=2)
+
+
 def update_ai_config(model_path: str, model_id: HuggingfaceModelId) -> None:
     config_file_path = config_file()
     config_file_data = config()
