@@ -2,21 +2,32 @@ from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 from openai import OpenAI
 from premia.db import internals
+from premia.utils import config, types
 from premia.utils.loader import Loader
 
+DEFAULT_LOCAL_MODEL_LINK = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/blob/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+
 LOCAL_SYSTEM_PROMPT_TEMPLATE = """
+[INST]
+You are an text-to-SQL assistant.
+
+You are given context about a database starting with "[CTX]" and ending with "[/CTX]".
+
+You are given a specification for a database query starting with "[SPEC]" and ending with "[/SPEC]".
+[/INST]
+[CTX]
 DuckDB SQL-database schema:
 ```sql
 {db_schema}
 ```
+[/CTX]
+[SPEC]
+{user_prompt}
+[/SPEC]
 [INST]
-You are an SQL assistant.
-
-You are given a specification for a database query starting with "[SPEC]" and ending with "[/SPEC]".
-
 Explain which tables and views are needed for the query. Then write one SQL command to fulfill the specification.
 
-Only include tables, views and columns specified in the mentioned database schema.
+Only include tables, views and columns specified in the context.
 [/INST]
 """
 
@@ -24,7 +35,6 @@ REMOTE_SYSTEM_PROMPT_TEMPLATE = """
 DuckDB SQL-database schema:
 ```sql
 {db_schema}
-- contact-type: 'call' or 'put'
 ```
 You are an SQL assistant.
 
@@ -37,26 +47,61 @@ Only include tables, views and columns specified in the mentioned database schem
 
 
 def init(
+    link: str | None = None,
     force=False,
-    model_repo="TheBloke/Mistral-7B-Instruct-v0.2-GGUF",
-    model_file="mistral-7b-instruct-v0.2.Q4_K_M.gguf",
 ) -> str:
-    model_path = hf_hub_download(
-        repo_id=model_repo, filename=model_file, force_download=force
-    )
+    if link:
+        return get_local_model_path(link)
+    else:
+        return get_local_model_path(DEFAULT_LOCAL_MODEL_LINK)
+
+
+def get_local_model_path(
+    link: str | None = None, force_download: bool = False
+) -> str:
+    ai_config = config.config().ai
+
+    if link:
+        model_id = config.HuggingfaceModelId.parse(link)
+        model_path = hf_hub_download(
+            repo_id=model_id.repo_id,
+            filename=model_id.filename,
+            force_download=force_download,
+            cache_dir=config.cache_dir(create_if_missing=True),
+        )
+
+        if not ai_config or model_id != ai_config.model_id:
+            config.update_ai_config(model_path, model_id)
+    elif ai_config:
+        model_path = hf_hub_download(
+            repo_id=ai_config.repo_id,
+            filename=ai_config.filename,
+            force_download=force_download,
+            cache_dir=config.cache_dir(create_if_missing=True),
+        )
+    else:
+        raise types.ConfigError(
+            "You need to either pass a model link or have a model set up in your config."
+        )
+
     return model_path
 
 
-def create_ai_prompt(user_prompt: str) -> str:
+def create_local_prompt(user_prompt: str) -> str:
     db_schema = internals.inspect()
-    system_prompt = LOCAL_SYSTEM_PROMPT_TEMPLATE.format(db_schema=db_schema)
-    input = f"{system_prompt}[SPEC]{user_prompt}[/SPEC]</s> "
-    return input
+    input = LOCAL_SYSTEM_PROMPT_TEMPLATE.format(
+        db_schema=db_schema, user_prompt=user_prompt
+    )
+    return f"{input}</s> "
 
 
 def create_local_completion(user_prompt: str, verbose: bool) -> str:
-    model_path = init()
-    llm = Llama(
+    try:
+        model_path = get_local_model_path()
+    except types.ConfigError:
+        raise types.ConfigError("Please set up a local model using `ai init`.")
+
+    model = Llama(
         model_path=model_path,
         n_ctx=8000,
         n_threads=7,
@@ -64,15 +109,13 @@ def create_local_completion(user_prompt: str, verbose: bool) -> str:
         verbose=verbose,
     )
 
-    generation_kwargs = {
-        "max_tokens": 2048,
-        "echo": True,
-        "stream": True,
-        "top_k": 0,
-    }
-
-    input = create_ai_prompt(user_prompt)
-    completion = llm(input, **generation_kwargs)
+    completion = model(
+        create_local_prompt(user_prompt),
+        max_tokens=2048,
+        echo=True,
+        stream=True,
+        top_k=0,
+    )
 
     loader = Loader()
     loader.start()

@@ -74,7 +74,7 @@ def add_instrument_migrations(
         raise click.Abort()
 
     base_table = f"{instrument.value}_1_{timespan.value}_candles"
-    config.update_config(
+    config.update_instrument_config(
         instrument,
         config.InstrumentConfig(
             base_table=base_table,

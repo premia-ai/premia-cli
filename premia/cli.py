@@ -21,29 +21,25 @@ def ai():
 
 
 @ai.command("init")
-@click.option("-f", "--force", default=False, is_flag=True)
 @click.option(
-    "-r",
-    "--repo",
-    help="The name of a model's huggingface repo (including the username)",
+    "-l",
+    "--link",
+    help="The link of a model's GGUF file hosted on huggingface.",
 )
 @click.option(
-    "-f", "--file", help="The file name inside the repo you want to download"
+    "-f",
+    "--force",
+    default=False,
+    is_flag=True,
+    help="Force the download of the model",
 )
-def ai_init(force: bool, repo: str, file: str):
+def ai_init(force: bool, link: str):
     """Initialize an open source LLM on your machine."""
 
-    if (repo and not file) or (file and not repo):
-        click.secho(
-            "Error: You need to define both a repo and a file",
-            err=True,
-            fg="red",
-        )
-        raise click.Abort()
-    elif not repo and not file:
-        model.init(force=force)
+    if link:
+        model.init(link, force)
     else:
-        model.init(force=force, model_repo=repo, model_file=file)
+        model.init(force=force)
 
 
 @ai.command()
@@ -68,7 +64,11 @@ def query(prompt: str, verbose: bool, remote: bool):
         client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         completion = model.create_remote_completion(prompt, client)
     else:
-        completion = model.create_local_completion(prompt, verbose=verbose)
+        try:
+            completion = model.create_local_completion(prompt, verbose=verbose)
+        except types.ConfigError as e:
+            click.secho(e, fg="red")
+            raise click.Abort()
 
     ai_cmd.execute_completion(completion)
 

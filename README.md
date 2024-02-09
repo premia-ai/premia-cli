@@ -46,6 +46,7 @@ The `ai` command allows you to setup and use an open source LLM to interact with
 You can download an LLM using `init`. By default it will install the Mistral 7B model.
 
 **Example**
+
 ```sh
 premia ai init
 ```
@@ -57,7 +58,7 @@ If you want to use another open source LLM you can do so by specifying a repo an
 Here an example on how to set up Mistral's bigger 8x7B Mixtral model.
 
 ```sh
-premia ai init --repo "TheBloke/Mixtral-8x7B-v0.1-GGUF" --file "mixtral-8x7b-v0.1.Q5_K_M.gguf"
+premia ai init --link "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/blob/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"
 ```
 
 #### `query`
