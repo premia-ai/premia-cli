@@ -207,7 +207,16 @@ def import_from_csv(
     metadata_csv_path="",
     allow_prompts=True,
 ):
-    instrument_config = config.config().instruments[instrument]
+    db_config = config.config().db
+    if db_config is None:
+        raise types.ConfigError("No database set up yet.")
+
+    instrument_config = db_config.instruments.get(instrument)
+    if instrument_config is None:
+        raise types.ConfigError(
+            f"{instrument.value.capitalize()} have not been set up yet."
+        )
+
     metadata_table = (
         "contracts"
         if instrument == types.InstrumentType.OPTIONS
@@ -269,7 +278,14 @@ def import_from_twelvedata():
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
-    stocks_config = config.config().instruments[types.InstrumentType.STOCKS]
+    db_config = config.config().db
+    if db_config is None:
+        raise types.ConfigError("No database set up yet.")
+
+    stocks_config = db_config.instruments.get(types.InstrumentType.STOCKS)
+    if stocks_config is None:
+        raise types.ConfigError("Stocks have not been set up yet.")
+
     twelvedata.import_market_data(
         types.ApiParams(
             symbol=symbol,
@@ -296,7 +312,14 @@ def import_from_yfinance():
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
-    stocks_config = config.config().instruments[types.InstrumentType.STOCKS]
+    db_config = config.config().db
+    if db_config is None:
+        raise types.ConfigError("No database set up yet.")
+
+    stocks_config = db_config.instruments.get(types.InstrumentType.STOCKS)
+    if stocks_config is None:
+        raise types.ConfigError("Stocks have not been set up yet.")
+
     yfinance.import_market_data(
         types.ApiParams(
             symbol=ticker,
@@ -322,7 +345,16 @@ def import_from_polygon(instrument: types.InstrumentType):
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
-    instrument_config = config.config().instruments[instrument]
+    db_config = config.config().db
+    if db_config is None:
+        raise types.ConfigError("No database set up yet.")
+
+    instrument_config = db_config.instruments.get(instrument)
+    if instrument_config is None:
+        raise types.ConfigError(
+            f"{instrument.value.capitalize()} have not been set up yet."
+        )
+
     polygon.import_market_data(
         types.ApiParams(
             symbol=symbol,

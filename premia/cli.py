@@ -54,6 +54,36 @@ Preference: {ai_config.preference}
     )
 
 
+@config_group.command("db")
+def config_db():
+    """Print DB config to stdout."""
+    db_config = config.config().db
+    if not db_config:
+        click.echo("No DB has been connected yet.")
+        return
+
+    instruments = ""
+    for instrument_type, instrument_config in db_config.instruments.items():
+        if not instruments:
+            instruments = "Instruments:\n"
+
+            instruments = (
+                instruments
+                + f"""\
+  {instrument_type.value.capitalize()}:
+    Raw Data: {instrument_config.base_table}
+    Timespan: {instrument_config.timespan_unit}
+"""
+            )
+
+    click.echo(
+        f"""\
+Type: {db_config.type}
+{instruments}
+"""
+    )
+
+
 @cli.group("ai")
 def ai_group():
     """Use an LLM to interact with your data infrastructure."""
@@ -314,7 +344,12 @@ def add_instrument(
     candles_path: str | None,
     metadata_path: str | None,
 ):
-    if config.config().instruments.get(instrument):
+    db_config = config.config().db
+    if db_config is None:
+        click.secho("You haven't connected a database yet.", fg="red")
+        raise click.Abort()
+
+    if db_config.instruments.get(instrument):
         click.secho(
             f"{instrument.value.capitalize()} have already been setup.",
             fg="red",

@@ -77,6 +77,9 @@ class InstrumentConfig:
 class DbConfig:
     type: Literal["DuckDB"]
     path: str
+    instruments: dict[types.InstrumentType, InstrumentConfig] = field(
+        default_factory=dict
+    )
 
 
 @dataclass
@@ -110,9 +113,6 @@ class ConfigFileData:
     version: str = "1"
     db: DbConfig | None = None
     ai: AiConfig | None = None
-    instruments: dict[types.InstrumentType, InstrumentConfig] = field(
-        default_factory=dict
-    )
 
     @classmethod
     def from_dict(cls, data_dict: dict) -> "ConfigFileData":
@@ -120,9 +120,16 @@ class ConfigFileData:
         config_file_data.version = data_dict.get("version", "1")
 
         db_config_dict = data_dict.get("db")
-        config_file_data.db = (
-            DbConfig(**db_config_dict) if db_config_dict else None
-        )
+        if db_config_dict:
+            instruments_config = {
+                types.InstrumentType(key): InstrumentConfig(**value)
+                for key, value in db_config_dict.get("instruments", {}).items()
+            }
+            config_file_data.db = DbConfig(
+                type=db_config_dict["type"],
+                path=db_config_dict["path"],
+                instruments=instruments_config,
+            )
 
         ai_config_dict = data_dict.get("ai")
         if ai_config_dict:
@@ -146,12 +153,6 @@ class ConfigFileData:
                 remote=remote_ai_config,
             )
 
-        config_file_data.instruments = data_dict.get("instruments", {})
-        config_file_data.instruments = {
-            types.InstrumentType(key): InstrumentConfig(**value)
-            for key, value in data_dict.get("instruments", {}).items()
-        }
-
         return config_file_data
 
     def to_dict(self) -> dict:
@@ -159,6 +160,11 @@ class ConfigFileData:
 
         if self.db:
             self_dict["db"] = self.db.__dict__.copy()
+            if len(self.db.instruments):
+                self_dict["db"]["instruments"] = {
+                    key.value: value.__dict__.copy()
+                    for key, value in self.db.instruments.items()
+                }
 
         if self.ai:
             self_dict["ai"] = self.ai.__dict__.copy()
@@ -166,11 +172,6 @@ class ConfigFileData:
                 self_dict["ai"]["local"] = self.ai.local.__dict__.copy()
             if self.ai.remote:
                 self_dict["ai"]["remote"] = self.ai.remote.__dict__.copy()
-
-        self_dict["instruments"] = {
-            key.value: value.__dict__.copy()
-            for key, value in self.instruments.items()
-        }
 
         return self_dict
 
@@ -185,7 +186,10 @@ def update_instrument_config(
     instrument: types.InstrumentType, data: InstrumentConfig
 ) -> None:
     config_file_data = config()
-    config_file_data.instruments[instrument] = data
+    if not config_file_data.db:
+        raise types.ConfigError("You haven't connected a database yet.")
+
+    config_file_data.db.instruments[instrument] = data
     save_config_file(config_file_data)
 
 

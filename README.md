@@ -59,6 +59,21 @@ Local:
     Filename: mistral-7b-instruct-v0.2.Q4_K_M.gguf
 ```
 
+#### `db`
+
+Show the database configuration
+
+**Example**
+```sh
+$ premia config db
+
+Type: DuckDB
+Instruments:
+  Stocks:
+    Raw Data: stocks_1_minute_candles
+    Timespan: minute
+```
+
 ### `ai`
 
 The `ai` command allows you to setup and use an open source LLM to interact with your infrastructure.
