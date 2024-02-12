@@ -1,4 +1,4 @@
-import os
+from typing import Literal
 import click
 from openai import OpenAI
 from premia.ai import model
@@ -14,35 +14,101 @@ def cli():
     pass
 
 
-@cli.group()
-def ai():
+@cli.group("config")
+def config_group():
+    """Access Config information."""
+    pass
+
+
+@config_group.command("ai")
+def config_ai():
+    """Print AI config to stdout."""
+    ai_config = config.config().ai
+    if not ai_config:
+        click.echo("No AI model set up yet.")
+        return
+
+    remote_config_str = ""
+    if ai_config.remote:
+        remote_config_str = f"""\
+Remote:
+  OpenAI Details:
+    API-Key: {ai_config.remote.api_key}
+    Model: {ai_config.remote.model}
+"""
+    local_config_str = ""
+    if ai_config.local:
+        local_config_str = f"""\
+Local:
+  Huggingface Details:
+    User: {ai_config.local.user}
+    Repo: {ai_config.local.repo}
+    Filename: {ai_config.local.filename}
+"""
+
+    click.echo(
+        f"""\
+Preference: {ai_config.preference}
+{remote_config_str}{local_config_str}
+"""
+    )
+
+
+@cli.group("ai")
+def ai_group():
     """Use an LLM to interact with your data infrastructure."""
     pass
 
 
-@ai.command("init")
-@click.option(
-    "-l",
-    "--link",
-    help="The link of a model's GGUF file hosted on huggingface.",
-)
+@ai_group.group("setup")
+def ai_setup():
+    """Setup the LLM you want to use with Premia."""
+
+
+@ai_setup.command("local")
+@click.argument("link", type=str)
 @click.option(
     "-f",
     "--force",
     default=False,
     is_flag=True,
-    help="Force the download of the model",
+    help="Force the download of the local model",
 )
-def ai_init(force: bool, link: str):
-    """Initialize an open source LLM on your machine."""
+def ai_setup_local(
+    link: str,
+    force: bool,
+):
+    """Setup a local LLM with a huggingface LINK. The link should point to a model's GGUF file."""
 
-    if link:
-        model.init(link, force)
-    else:
-        model.init(force=force)
+    model.get_local_model_path(link, force)
 
 
-@ai.command()
+@ai_setup.command("remote")
+@click.argument("api_key", type=str)
+@click.option(
+    "-m",
+    "--model",
+    "model_name",
+    type=str,
+    help="The OpenAI model you would like to use",
+    default="gpt-3.5-turbo",
+)
+def ai_setup_remote(
+    api_key: str,
+    model_name: str,
+):
+    """Setup a remote LLM with an OpenAI API_KEY."""
+    model.setup_remote_model(api_key, model_name)
+
+
+@ai_group.command("preference")
+@click.argument("ai_type", type=click.Choice(["local", "remote"]))
+def ai_set_preference(preference: Literal["local", "remote"]):
+    """Set the preference on whether to use a local or remote model. Check your current setup with `config ai`"""
+    config.update_ai_config(preference)
+
+
+@ai_group.command("query")
 @click.argument("prompt")
 @click.option(
     "-v",
@@ -51,17 +117,14 @@ def ai_init(force: bool, link: str):
     is_flag=True,
     help="Print the execution of the LLM",
 )
-@click.option(
-    "-r",
-    "--remote",
-    default=False,
-    is_flag=True,
-    help="Use a remotely hosted LLM",
-)
-def query(prompt: str, verbose: bool, remote: bool):
+def ai_query(prompt: str, verbose: bool, remote: bool):
     """Query your data with the help of an LLM."""
-    if remote:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    ai_config = config.config().ai
+    if not ai_config:
+        raise types.AiError("Please setup an AI model before running a query.")
+
+    if ai_config.preference == "remote" and ai_config.remote:
+        client = OpenAI(api_key=ai_config.remote.api_key)
         completion = model.create_remote_completion(prompt, client)
     else:
         try:
@@ -73,14 +136,14 @@ def query(prompt: str, verbose: bool, remote: bool):
     ai_cmd.execute_completion(completion)
 
 
-@cli.group()
-def db():
+@cli.group("db")
+def db_group():
     """Setup and manage your data infrastructure."""
     pass
 
 
-@db.command()
-def schema():
+@db_group.command("schema")
+def db_schema():
     """Print schema of your database."""
     try:
         db_schema = internals.inspect()
@@ -90,8 +153,8 @@ def schema():
         raise click.Abort()
 
 
-@db.command()
-def tables():
+@db_group.command("tables")
+def db_tables():
     """List tables in your database."""
     try:
         tables = internals.tables()
@@ -101,7 +164,7 @@ def tables():
         raise click.Abort()
 
 
-@db.command("setup")
+@db_group.command("setup")
 @click.option(
     "-p",
     "--path",
@@ -125,7 +188,7 @@ def db_setup(path: str):
         )
 
 
-@db.command("init")
+@db_group.command("init")
 def db_init():
     """Initialize a financial database."""
     config.setup_config_dir()
@@ -146,7 +209,7 @@ def db_init():
         raise click.Abort()
 
 
-@db.command("import")
+@db_group.command("import")
 def db_import():
     """
     Import data from common financial data vendors.
@@ -158,14 +221,14 @@ def db_import():
         raise click.Abort()
 
 
-@db.command()
+@db_group.command("table")
 @click.argument("table_name")
-def table(table_name: str):
+def db_table(table_name: str):
     con = migration.connect()
     con.sql(f"FROM {table_name};").show()
 
 
-@db.group("add")
+@db_group.group("add")
 def db_add():
     """
     Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init` otherwise.

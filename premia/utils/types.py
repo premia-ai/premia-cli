@@ -193,6 +193,12 @@ class DbError(Exception):
     pass
 
 
+class AiError(Exception):
+    """Custom exception class for ai related errors."""
+
+    pass
+
+
 class MigrationError(Exception):
     """Custom exception class for migration errors."""
 

@@ -5,8 +5,6 @@ from premia.db import internals
 from premia.utils import config, types
 from premia.utils.loader import Loader
 
-DEFAULT_LOCAL_MODEL_LINK = "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/blob/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
-
 LOCAL_SYSTEM_PROMPT_TEMPLATE = """
 [INST]
 You are an text-to-SQL assistant.
@@ -46,20 +44,15 @@ Only include tables, views and columns specified in the mentioned database schem
 """
 
 
-def init(
-    link: str | None = None,
-    force=False,
-) -> str:
-    if link:
-        return get_local_model_path(link)
-    else:
-        return get_local_model_path(DEFAULT_LOCAL_MODEL_LINK)
+def setup_remote_model(api_key: str, model_name: str):
+    config.update_remote_ai_config(api_key=api_key, model_name=model_name)
 
 
 def get_local_model_path(
     link: str | None = None, force_download: bool = False
 ) -> str:
     ai_config = config.config().ai
+    local_ai_config = ai_config.local if ai_config else None
 
     if link:
         model_id = config.HuggingfaceModelId.parse(link)
@@ -69,19 +62,17 @@ def get_local_model_path(
             force_download=force_download,
             cache_dir=config.cache_dir(create_if_missing=True),
         )
-
-        if not ai_config or model_id != ai_config.model_id:
-            config.update_ai_config(model_path, model_id)
-    elif ai_config:
+        config.update_local_ai_config(model_path, model_id)
+    elif local_ai_config:
         model_path = hf_hub_download(
-            repo_id=ai_config.repo_id,
-            filename=ai_config.filename,
+            repo_id=local_ai_config.repo_id,
+            filename=local_ai_config.filename,
             force_download=force_download,
             cache_dir=config.cache_dir(create_if_missing=True),
         )
     else:
         raise types.ConfigError(
-            "You need to either pass a model link or have a model set up in your config."
+            "You need to either pass a model link or have a local model set up in your config."
         )
 
     return model_path
@@ -136,10 +127,14 @@ def create_local_completion(user_prompt: str, verbose: bool) -> str:
 
 
 def create_remote_completion(user_prompt: str, ai_client: OpenAI) -> str:
+    ai_config = config.config().ai
+    if not ai_config or not ai_config.remote:
+        raise types.ConfigError("No remote AI model setup.")
+
     db_schema = internals.inspect()
     system_prompt = REMOTE_SYSTEM_PROMPT_TEMPLATE.format(db_schema=db_schema)
     stream = ai_client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model=ai_config.remote.model,
         stream=True,
         messages=[
             {"role": "system", "content": system_prompt},

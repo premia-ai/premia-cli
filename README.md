@@ -37,28 +37,60 @@ bin/install.sh
 
 ## Commands
 
+### `config`
+
+#### `ai`
+
+Show the AI configuration
+
+**Example**
+```sh
+$ premia config ai
+
+Preference: local
+Remote:
+  OpenAI Details:
+    API-Key: sk-example-api-key
+    Model: gpt-3.5-turbo
+Local:
+  Huggingface Details:
+    User: TheBloke
+    Repo: Mistral-7B-Instruct-v0.2-GGUF
+    Filename: mistral-7b-instruct-v0.2.Q4_K_M.gguf
+```
+
 ### `ai`
 
 The `ai` command allows you to setup and use an open source LLM to interact with your infrastructure.
 
-#### `init`
+#### `setup`
 
-You can download an LLM using `init`. By default it will install the Mistral 7B model.
+`setup` allows you to download an open source LLM like Mistral's 7B model or connect to a proprietary model like OpenAI's GPT-4.
 
 **Example**
 
+If you want to set up Mistral 7B you can just run the following command.
+
 ```sh
-premia ai init
+$ premia ai setup local "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/blob/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
 ```
+
+**Example**
 
 If you want to use another open source LLM you can do so by specifying a repo and GGUF file from [HuggingFace](https://huggingface.co).
 
-**Example**
-
-Here an example on how to set up Mistral's bigger 8x7B Mixtral model.
+Here another example using Mistral's bigger 8x7B Mixtral model.
 
 ```sh
-premia ai init --link "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/blob/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"
+$ premia ai setup local "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/blob/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"
+```
+
+**Example**
+
+If you want to set up a remote LLM from OpenAI you can do so as well (the `--model` flag is optional and defaults to `"gpt-3.5-turbo"`)
+
+```sh
+$ premia ai setup remote "sk-example-api-key" --model "gpt-4"
 ```
 
 #### `query`
@@ -67,7 +99,7 @@ With `query` you can ask the LLM to create SQL commands for you to query your db
 
 **Example**
 ````sh
-premia ai query 'Get the average stock price of a company with the name "Tesla Inc." for the year 2024'
+$ premia ai query 'Get the average stock price of a company with the name "Tesla Inc." for the year 2024'
 
 ```sql
 SELECT AVG(stocks_1_day_candles.close) as avg_price
@@ -93,10 +125,10 @@ The `db` command allows to setup or interact with an SQL database for financial 
 
 ```sh
 # Create a new DB for premia
-premia db setup
+$ premia db setup
 
 # Connect Premia to a DB called `securities.db` in the home directory
-premia db setup --path ~/securities.db
+$ premia db setup --path ~/securities.db
 ```
 
 #### `schema`

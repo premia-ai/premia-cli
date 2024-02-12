@@ -80,14 +80,29 @@ class DbConfig:
 
 
 @dataclass
-class AiConfig(HuggingfaceModelId):
+class RemoteAiConfig:
+    api_key: str
+    model: str
+
+
+@dataclass
+class LocalAiConfig(HuggingfaceModelId):
     model_path: str
 
     @property
     def model_id(self):
         return HuggingfaceModelId(
-            user=self.user, repo=self.repo, filename=self.filename
+            user=self.user,
+            repo=self.repo,
+            filename=self.filename,
         )
+
+
+@dataclass
+class AiConfig:
+    preference: Literal["local", "remote"]
+    local: LocalAiConfig | None = None
+    remote: RemoteAiConfig | None = None
 
 
 @dataclass
@@ -110,9 +125,26 @@ class ConfigFileData:
         )
 
         ai_config_dict = data_dict.get("ai")
-        config_file_data.ai = (
-            AiConfig(**ai_config_dict) if ai_config_dict else None
-        )
+        if ai_config_dict:
+            local_ai_config_dict = ai_config_dict.get("local")
+            remote_ai_config_dict = ai_config_dict.get("remote")
+
+            local_ai_config = (
+                LocalAiConfig(**local_ai_config_dict)
+                if local_ai_config_dict
+                else None
+            )
+            remote_ai_config = (
+                RemoteAiConfig(**remote_ai_config_dict)
+                if remote_ai_config_dict
+                else None
+            )
+
+            config_file_data.ai = AiConfig(
+                preference=ai_config_dict["preference"],
+                local=local_ai_config,
+                remote=remote_ai_config,
+            )
 
         config_file_data.instruments = data_dict.get("instruments", {})
         config_file_data.instruments = {
@@ -130,6 +162,10 @@ class ConfigFileData:
 
         if self.ai:
             self_dict["ai"] = self.ai.__dict__.copy()
+            if self.ai.local:
+                self_dict["ai"]["local"] = self.ai.local.__dict__.copy()
+            if self.ai.remote:
+                self_dict["ai"]["remote"] = self.ai.remote.__dict__.copy()
 
         self_dict["instruments"] = {
             key.value: value.__dict__.copy()
@@ -139,20 +175,21 @@ class ConfigFileData:
         return self_dict
 
 
-def update_instrument_config(
-    instrument: types.InstrumentType, data: InstrumentConfig
-) -> None:
-    config_file_path = config_file()
-    config_file_data = config()
-
-    config_file_data.instruments[instrument] = data
-
+def save_config_file(config_file_data: ConfigFileData, create_if_missing=False):
+    config_file_path = config_file(create_if_missing)
     with open(config_file_path, "w") as file:
         json.dump(config_file_data.to_dict(), file, indent=2)
 
 
+def update_instrument_config(
+    instrument: types.InstrumentType, data: InstrumentConfig
+) -> None:
+    config_file_data = config()
+    config_file_data.instruments[instrument] = data
+    save_config_file(config_file_data)
+
+
 def update_db_config(path="") -> None:
-    config_file_path = config_file(create_if_missing=True)
     config_file_data = config()
 
     if config_file_data.db and not path:
@@ -169,29 +206,55 @@ def update_db_config(path="") -> None:
     elif config_file_data.db and path:
         config_file_data.db.path = path
 
-    with open(config_file_path, "w") as file:
-        json.dump(config_file_data.to_dict(), file, indent=2)
+    save_config_file(config_file_data, create_if_missing=True)
 
 
-def update_ai_config(model_path: str, model_id: HuggingfaceModelId) -> None:
-    config_file_path = config_file()
+def update_remote_ai_config(api_key: str, model_name: str) -> None:
     config_file_data = config()
 
-    if config_file_data.ai:
+    if not config_file_data.ai:
+        config_file_data.ai = AiConfig(preference="remote")
+
+    config_file_data.ai.remote = RemoteAiConfig(
+        api_key=api_key, model=model_name
+    )
+    save_config_file(config_file_data)
+
+
+def update_local_ai_config(
+    model_path: str, model_id: HuggingfaceModelId
+) -> None:
+    config_file_data = config()
+
+    if config_file_data.ai and config_file_data.ai.local:
         try:
-            shutil.rmtree(config_file_data.ai.model_path)
+            shutil.rmtree(config_file_data.ai.local.model_path)
         except OSError as e:
             click.secho(
                 f"""\
-Could not delete model cached in: {config_file_data.ai.model_path}.
+Could not delete model cached in: {config_file_data.ai.local.model_path}.
 The following error was raised:
 {e}""",
                 fg="red",
             )
 
-    config_file_data.ai = AiConfig(model_path=model_path, **model_id.__dict__)
-    with open(config_file_path, "w") as file:
-        json.dump(config_file_data.to_dict(), file, indent=2)
+    if not config_file_data.ai:
+        config_file_data.ai = AiConfig(preference="local")
+
+    config_file_data.ai.local = LocalAiConfig(
+        model_path=model_path, **model_id.__dict__
+    )
+
+    save_config_file(config_file_data)
+
+
+def update_ai_config(preference: Literal["local", "remote"]) -> None:
+    config_file_data = config()
+    if not config_file_data.ai:
+        raise types.ConfigError("You haven't set up an AI model yet.")
+
+    config_file_data.ai.preference = preference
+    save_config_file(config_file_data)
 
 
 def config(create_if_missing=False) -> "ConfigFileData":
