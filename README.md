@@ -12,18 +12,18 @@ The easiest way to try Premia is to follow the following steps:
 
 ```sh
 # Download project
-git clone https://github.com/premia-ai/cli premia-cli
-cd premia-cli
+$ git clone https://github.com/premia-ai/cli premia-cli
+$ cd premia-cli
 
 # Install project
-chmod +x bin/install.sh
-bin/install.sh
+$ chmod +x bin/install.sh
+$ bin/install.sh
 
 # Set up sample DB and optionally import data
-premia db init
+$ premia db init
 
 # Set up local AI
-premia ai init
+$ premia ai init
 ```
 
 ## Setup
@@ -31,8 +31,8 @@ premia ai init
 Run the following commands in your terminal from the repo's folder, to install the `premia` command.
 
 ```sh
-chmod +x bin/install.sh
-bin/install.sh
+$ chmod +x bin/install.sh
+$ bin/install.sh
 ```
 
 ## Commands
@@ -173,11 +173,11 @@ We manage the repo with [`Pipenv`](https://pipenv.pypa.io/en/latest/#install-pip
 To install the project's dependencies run
 
 ```sh
-pipenv install
+$ pipenv install
 ```
 
 To run the project while working on it run
 
 ```sh
-pipenv run python -m premia
+$ pipenv run python -m premia
 ```
