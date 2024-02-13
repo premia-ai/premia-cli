@@ -173,7 +173,7 @@ def ai_query(prompt: str, verbose: bool):
             completion = model.create_local_completion(prompt, verbose=verbose)
         except types.ConfigError as e:
             click.secho(e, fg="red")
-            raise click.Abort()
+            sys.exit(1)
 
     ai_cmd.execute_completion(completion)
 
@@ -192,7 +192,7 @@ def db_schema():
         click.echo(db_schema)
     except Exception as e:
         click.secho(e, fg="red")
-        raise click.Abort()
+        sys.exit(1)
 
 
 @db_group.command("tables")
@@ -203,7 +203,7 @@ def db_tables():
         click.echo("\n".join(tables))
     except ValueError as e:
         click.secho(e, fg="red")
-        raise click.Abort()
+        sys.exit(1)
 
 
 @db_group.command("setup")
@@ -239,7 +239,7 @@ def db_init():
         db_cmd.setup()
     except Exception as e:
         click.secho(e, fg="red")
-        raise click.Abort()
+        sys.exit(1)
 
     if not click.confirm("Do you want to seed the db?"):
         return
@@ -248,7 +248,7 @@ def db_init():
         db_cmd.seed()
     except Exception as e:
         click.secho(e, fg="red")
-        raise click.Abort()
+        sys.exit(1)
 
 
 @db_group.command("import")
@@ -260,7 +260,7 @@ def db_import():
         db_cmd.seed()
     except Exception as e:
         click.secho(e, fg="red")
-        raise click.Abort()
+        sys.exit(1)
 
 
 @db_group.command("table")
@@ -359,14 +359,14 @@ def add_instrument(
     db_config = config.config().db
     if db_config is None:
         click.secho("You haven't connected a database yet.", fg="red")
-        raise click.Abort()
+        sys.exit(1)
 
     if db_config.instruments.get(instrument):
         click.secho(
             f"{instrument.value.capitalize()} have already been setup.",
             fg="red",
         )
-        raise click.Abort()
+        sys.exit(1)
 
     if frequency:
         timespan = types.Timespan(frequency)
