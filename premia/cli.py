@@ -7,6 +7,13 @@ from premia.db import internals, migration
 from premia.utils import config, types
 from premia.wizard import db_cmd, ai_cmd
 
+DEFAULT_TIMESPAN_CHOICES = [
+    types.Timespan.SECOND.value,
+    types.Timespan.MINUTE.value,
+    types.Timespan.HOUR.value,
+    types.Timespan.DAY.value,
+]
+
 
 @click.version_option("0.0.2", prog_name="premia")
 @click.group()
@@ -284,14 +291,7 @@ def db_add():
     "--frequency",
     help="The frequency the candle data has.",
     default=None,
-    type=click.Choice(
-        [
-            types.Timespan.SECOND.value,
-            types.Timespan.MINUTE.value,
-            types.Timespan.HOUR.value,
-            types.Timespan.DAY.value,
-        ]
-    ),
+    type=click.Choice(DEFAULT_TIMESPAN_CHOICES),
 )
 @click.option(
     "--candles-path",
@@ -320,14 +320,7 @@ def add_stocks(
     "--frequency",
     help="The frequency the candle data has.",
     default=None,
-    type=click.Choice(
-        [
-            types.Timespan.SECOND.value,
-            types.Timespan.MINUTE.value,
-            types.Timespan.HOUR.value,
-            types.Timespan.DAY.value,
-        ]
-    ),
+    type=click.Choice(DEFAULT_TIMESPAN_CHOICES),
 )
 @click.option(
     "--candles-path",
