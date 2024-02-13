@@ -1,6 +1,9 @@
+from typing import Literal, TypeAlias
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime
+
+AiModel: TypeAlias = Literal["remote", "local"]
 
 
 class InstrumentType(Enum):
@@ -173,12 +176,6 @@ class OptionSymbol:
             contract_type=contract_type,
             strike_price=strike_price,
         )
-
-
-class ConfigError(Exception):
-    """Custom exception class for config directory related errors."""
-
-    pass
 
 
 class DataImportError(Exception):

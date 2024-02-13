@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 import shutil
 import click
-from premia.utils import types
+from premia.utils import types, errors
 
 CONFIG_DIR = ".premia"
 MIGRATIONS_DIR = f"{CONFIG_DIR}/migrations"
@@ -22,7 +22,7 @@ def get_dir(dir_path: str, create_if_missing=False) -> str:
 
     if not os.path.exists(dir_path):
         if not create_if_missing:
-            raise types.ConfigError(f"'{dir_path}' directory doesn't exist.")
+            raise errors.ConfigError(f"'{dir_path}' directory doesn't exist.")
         os.makedirs(dir_path, mode=0o777)
 
     return dir_path
@@ -103,7 +103,7 @@ class LocalAiConfig(HuggingfaceModelId):
 
 @dataclass
 class AiConfig:
-    preference: Literal["local", "remote"]
+    preference: types.AiModel
     local: LocalAiConfig | None = None
     remote: RemoteAiConfig | None = None
 
@@ -177,7 +177,7 @@ class ConfigFileData:
 
 
 def save_config_file(config_file_data: ConfigFileData, create_if_missing=False):
-    config_file_path = config_file(create_if_missing)
+    config_file_path = get_config_file_path(create_if_missing)
     with open(config_file_path, "w") as file:
         json.dump(config_file_data.to_dict(), file, indent=2)
 
@@ -185,16 +185,16 @@ def save_config_file(config_file_data: ConfigFileData, create_if_missing=False):
 def update_instrument_config(
     instrument: types.InstrumentType, data: InstrumentConfig
 ) -> None:
-    config_file_data = config()
+    config_file_data = get_config()
     if not config_file_data.db:
-        raise types.ConfigError("You haven't connected a database yet.")
+        raise errors.MissingDbError()
 
     config_file_data.db.instruments[instrument] = data
     save_config_file(config_file_data)
 
 
 def update_db_config(path="") -> None:
-    config_file_data = config()
+    config_file_data = get_config()
 
     if config_file_data.db and not path:
         click.secho(
@@ -214,7 +214,7 @@ def update_db_config(path="") -> None:
 
 
 def update_remote_ai_config(api_key: str, model_name: str) -> None:
-    config_file_data = config()
+    config_file_data = get_config()
 
     if not config_file_data.ai:
         config_file_data.ai = AiConfig(preference="remote")
@@ -228,7 +228,7 @@ def update_remote_ai_config(api_key: str, model_name: str) -> None:
 def update_local_ai_config(
     model_path: str, model_id: HuggingfaceModelId
 ) -> None:
-    config_file_data = config()
+    config_file_data = get_config()
 
     if config_file_data.ai and config_file_data.ai.local:
         try:
@@ -252,13 +252,13 @@ The following error was raised:
     save_config_file(config_file_data)
 
 
-def update_ai_config(preference: Literal["local", "remote"]) -> None:
-    config_file_data = config()
+def update_ai_config(preference: types.AiModel) -> None:
+    config_file_data = get_config()
     if not config_file_data.ai:
-        raise types.ConfigError("You haven't set up an AI model yet.")
+        raise errors.MissingAiError()
 
     if getattr(config_file_data.ai, preference) is None:
-        raise types.ConfigError(
+        raise errors.ConfigError(
             f"Cannot change the preference to '{preference}'. No {preference} model has been set up."
         )
 
@@ -266,21 +266,90 @@ def update_ai_config(preference: Literal["local", "remote"]) -> None:
     save_config_file(config_file_data)
 
 
-def config(create_if_missing=False) -> "ConfigFileData":
-    config_file_path = config_file(create_if_missing)
+def get_instrument_config_or_raise(
+    instrument: types.InstrumentType,
+) -> InstrumentConfig:
+    instrument_config = get_instrument_config(instrument)
+    if instrument_config is None:
+        raise errors.MissingInstrumentError(instrument)
+
+    return instrument_config
+
+
+def get_instrument_config(
+    instrument: types.InstrumentType,
+) -> InstrumentConfig | None:
+    db_config = get_db_config()
+
+    if db_config is None:
+        raise errors.MissingDbError()
+
+    return db_config.instruments.get(instrument)
+
+
+def get_db_config_or_raise() -> DbConfig:
+    db_config = get_db_config()
+    if db_config is None:
+        raise errors.MissingDbError()
+
+    return db_config
+
+
+def get_db_config() -> DbConfig | None:
+    return get_config().db
+
+
+def get_remote_ai_config_or_raise() -> RemoteAiConfig:
+    remote_ai_config = get_remote_ai_config()
+    if remote_ai_config is None:
+        raise errors.MissingRemoteAiError()
+
+    return remote_ai_config
+
+
+def get_remote_ai_config() -> RemoteAiConfig | None:
+    return get_ai_config_or_raise().remote
+
+
+def get_local_ai_config_or_raise() -> LocalAiConfig:
+    local_ai_config = get_local_ai_config()
+    if local_ai_config is None:
+        raise errors.MissingLocalAiError()
+
+    return local_ai_config
+
+
+def get_local_ai_config() -> LocalAiConfig | None:
+    return get_ai_config_or_raise().local
+
+
+def get_ai_config_or_raise() -> AiConfig:
+    ai_config = get_ai_config()
+    if ai_config is None:
+        raise errors.MissingAiError()
+
+    return ai_config
+
+
+def get_ai_config() -> AiConfig | None:
+    return get_config().ai
+
+
+def get_config(create_if_missing=False) -> ConfigFileData:
+    config_file_path = get_config_file_path(create_if_missing)
 
     with open(config_file_path, "r") as file:
         config_data = json.load(file)
         return ConfigFileData.from_dict(config_data)
 
 
-def config_file(create_if_missing=False) -> str:
+def get_config_file_path(create_if_missing=False) -> str:
     config_dir(create_if_missing)
     config_file_path = os.path.expanduser(CONFIG_FILE_PATH)
 
     if not os.path.exists(config_file_path):
         if not create_if_missing:
-            raise types.ConfigError("'config.json' doesn't exist.")
+            raise errors.ConfigError("Premia has not been set up yet.")
 
         config_file_data = ConfigFileData()
         with open(config_file_path, "w") as file:
@@ -291,7 +360,7 @@ def config_file(create_if_missing=False) -> str:
 
 def setup_config_dir() -> str:
     config_dir_path = config_dir(True)
-    config_file(True)
+    get_config_file_path(True)
     migrations_dir(True)
 
     return config_dir_path

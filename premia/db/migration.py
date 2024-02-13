@@ -2,14 +2,12 @@ import os
 from typing import cast
 import duckdb
 from premia.utils import types, config
+from premia.db import template
 
 
 def connect() -> duckdb.DuckDBPyConnection:
-    db_config = config.config().db
-    if db_config:
-        return duckdb.connect(db_config.path)
-    else:
-        raise types.DbError("Premia has not been connected to a database.")
+    db_config = config.get_db_config_or_raise()
+    return duckdb.connect(db_config.path)
 
 
 def columns(
@@ -105,9 +103,7 @@ def apply_all(con: duckdb.DuckDBPyConnection, directory: str) -> None:
 
 
 def reset() -> None:
-    db_config = config.config().db
-    if not db_config:
-        raise types.DbError("Premia is not connected to a database.")
+    db_config = config.get_db_config_or_raise()
 
     try:
         os.remove(db_config.path)
@@ -136,3 +132,105 @@ def copy_csv(
 def get_migration_version(filename: str) -> str:
     version = filename.split("_")[0]
     return version
+
+
+def add_instrument_raw_data(
+    instrument: types.InstrumentType,
+    timespan: types.Timespan,
+    apply=False,
+):
+    base_table = f"{instrument.value}_1_{timespan.value}_candles"
+
+    template.create_migration_file(
+        "add_candles",
+        template.SqlTemplateData(
+            instrument=instrument,
+            quantity=1,
+            timespan=timespan,
+        ),
+    )
+
+    instrument_config = config.InstrumentConfig(
+        base_table=base_table,
+        timespan_unit=timespan.value,
+    )
+
+    config.update_instrument_config(instrument, instrument_config)
+
+    if instrument == types.InstrumentType.STOCKS:
+        template.create_migration_file("add_companies")
+    elif instrument == types.InstrumentType.OPTIONS:
+        template.create_migration_file("add_contracts")
+
+    if apply:
+        apply_all(connect(), config.migrations_dir())
+
+
+def add_instrument_aggregates(
+    instrument: types.InstrumentType,
+    timespans: list[types.Timespan],
+    apply=False,
+) -> None:
+    instrument_config = config.get_instrument_config_or_raise(instrument)
+    raw_data_timespan = types.Timespan(instrument_config.timespan_unit)
+    raw_data_timespan_info = types.timespan_info[raw_data_timespan]
+
+    for timespan in timespans:
+        if timespan not in raw_data_timespan_info.bigger_units:
+            raise types.MigrationError(
+                f"Cannot add a {instrument.value} aggregate table with the frequency '{timespan.value}' for raw data with the frequency '{raw_data_timespan.value}'."
+            )
+
+        template.create_migration_file(
+            "add_aggregate_candles",
+            template.SqlTemplateData(
+                instrument=instrument,
+                quantity=1,
+                timespan=timespan,
+                reference_table=instrument_config.base_table,
+            ),
+        )
+
+    if apply:
+        apply_all(connect(), config.migrations_dir())
+
+
+def add_instrument_features(
+    instrument: types.InstrumentType, feature_names: list[str], apply=False
+) -> None:
+    instrument_config = config.get_instrument_config_or_raise(instrument)
+    raw_data_timespan = types.Timespan(instrument_config.timespan_unit)
+
+    for feature_name in feature_names:
+        if feature_name not in template.get_feature_names():
+            raise types.MigrationError(
+                f"Feature with the name '{feature_name}' does not exist."
+            )
+
+        template.create_migration_file(
+            f"add_{feature_name}",
+            template.SqlTemplateData(
+                instrument=instrument,
+                quantity=1,
+                timespan=raw_data_timespan,
+                reference_table=instrument_config.base_table,
+            ),
+        )
+
+    if apply:
+        apply_all(connect(), config.migrations_dir())
+
+
+def add_instrument(
+    instrument: types.InstrumentType,
+    timespan: types.Timespan,
+    aggregate_timespans: list[types.Timespan] = [],
+    feature_names: list[str] = [],
+    apply=False,
+) -> None:
+    add_instrument_raw_data(instrument, timespan)
+    add_instrument_aggregates(instrument, aggregate_timespans)
+    add_instrument_features(instrument, feature_names)
+
+    if apply:
+        apply_all(connect(), config.migrations_dir())

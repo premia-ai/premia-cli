@@ -1,10 +1,9 @@
-from typing import Literal
 import sys
 import click
 from openai import OpenAI
 from premia.ai import model
-from premia.db import internals, migration
-from premia.utils import config, types
+from premia.db import internals, migration, template
+from premia.utils import config, types, errors
 from premia.wizard import db_cmd, ai_cmd
 
 DEFAULT_TIMESPAN_CHOICES = [
@@ -31,10 +30,7 @@ def config_group():
 @config_group.command("ai")
 def config_ai():
     """Print AI config to stdout."""
-    ai_config = config.config().ai
-    if not ai_config:
-        click.echo("No AI model set up yet.")
-        return
+    ai_config = config.get_ai_config_or_raise()
 
     remote_config_str = ""
     if ai_config.remote:
@@ -64,10 +60,7 @@ Preference: {ai_config.preference}
 @config_group.command("db")
 def config_db():
     """Print DB config to stdout."""
-    db_config = config.config().db
-    if not db_config:
-        click.echo("No DB has been connected yet.")
-        return
+    db_config = config.get_db_config_or_raise()
 
     instruments = ""
     for instrument_type, instrument_config in db_config.instruments.items():
@@ -143,12 +136,12 @@ def ai_set_model_remote(
 
 @ai_group.command("set-preference")
 @click.argument("preference", type=click.Choice(["local", "remote"]))
-def ai_set_preference(preference: Literal["local", "remote"]):
+def ai_set_preference(preference: types.AiModel):
     """Set the preference on whether to use a local or remote model. Check your current setup with `config ai`"""
     try:
         config.update_ai_config(preference)
-    except types.ConfigError as e:
-        click.secho(str(e), fg="red")
+    except errors.ConfigError as e:
+        click.secho(e, fg="red")
         sys.exit(1)
 
     click.secho(
@@ -168,9 +161,12 @@ def ai_set_preference(preference: Literal["local", "remote"]):
 )
 def ai_query(prompt: str, verbose: bool):
     """Query your data with the help of an LLM."""
-    ai_config = config.config().ai
+    ai_config = config.get_ai_config()
     if not ai_config:
-        raise types.AiError("Please setup an AI model before running a query.")
+        click.secho(
+            "Please setup an AI model before running a query.", fg="red"
+        )
+        sys.exit(1)
 
     if ai_config.preference == "remote" and ai_config.remote:
         client = OpenAI(api_key=ai_config.remote.api_key)
@@ -178,7 +174,7 @@ def ai_query(prompt: str, verbose: bool):
     else:
         try:
             completion = model.create_local_completion(prompt, verbose=verbose)
-        except types.ConfigError as e:
+        except errors.ConfigError as e:
             click.secho(e, fg="red")
             sys.exit(1)
 
@@ -277,6 +273,11 @@ def db_table(table_name: str):
     con.sql(f"FROM {table_name};").show()
 
 
+@db_group.command("available-features")
+def db_available_features():
+    click.echo("\n".join(template.get_feature_names()))
+
+
 @db_group.group("add")
 def db_add():
     """
@@ -294,6 +295,22 @@ def db_add():
     type=click.Choice(DEFAULT_TIMESPAN_CHOICES),
 )
 @click.option(
+    "-a",
+    "--aggregate",
+    "aggregates",
+    multiple=True,
+    help="Create aggregate tables based on original data table. Value needs to be bigger than frequency",
+    type=click.Choice(DEFAULT_TIMESPAN_CHOICES),
+)
+@click.option(
+    "-F",
+    "--feature",
+    "feature_names",
+    multiple=True,
+    help="Create feature tables based on original data table",
+    type=click.Choice(template.get_feature_names()),
+)
+@click.option(
     "--candles-path",
     default=None,
     help="File path for the stock candles data stored in a CSV to seed the new table.",
@@ -304,13 +321,22 @@ def db_add():
     help="File path for the company data stored in a CSV to seed the new table.",
 )
 def add_stocks(
-    frequency: str | None, candles_path: str | None, companies_path: str | None
+    frequency: str | None,
+    aggregates: list[str],
+    feature_names: list[str],
+    candles_path: str | None,
+    companies_path: str | None,
 ):
     """
     Add database tables for stocks.
     """
     add_instrument(
-        types.InstrumentType.STOCKS, frequency, candles_path, companies_path
+        types.InstrumentType.STOCKS,
+        frequency,
+        aggregates,
+        feature_names,
+        candles_path,
+        companies_path,
     )
 
 
@@ -323,6 +349,22 @@ def add_stocks(
     type=click.Choice(DEFAULT_TIMESPAN_CHOICES),
 )
 @click.option(
+    "-a",
+    "--aggregate",
+    "aggregates",
+    multiple=True,
+    help="Create aggregate tables based on raw data table. Value needs to be bigger than frequency",
+    type=click.Choice(DEFAULT_TIMESPAN_CHOICES),
+)
+@click.option(
+    "-F",
+    "--feature",
+    "feature_names",
+    multiple=True,
+    help="Create feature tables based on original data table",
+    type=click.Choice(template.get_feature_names()),
+)
+@click.option(
     "--candles-path",
     default=None,
     help="File path for the option candles data stored in a CSV to seed the new table.",
@@ -333,27 +375,34 @@ def add_stocks(
     help="File path for the contract data stored in a CSV to seed the new table.",
 )
 def add_options(
-    frequency: str | None, candles_path: str | None, contracts_path: str | None
+    frequency: str | None,
+    aggregates: list[str],
+    feature_names: list[str],
+    candles_path: str | None,
+    contracts_path: str | None,
 ):
     """
     Add database tables for options.
     """
     add_instrument(
-        types.InstrumentType.OPTIONS, frequency, candles_path, contracts_path
+        types.InstrumentType.OPTIONS,
+        frequency,
+        aggregates,
+        feature_names,
+        candles_path,
+        contracts_path,
     )
 
 
 def add_instrument(
     instrument: types.InstrumentType,
     frequency: str | None,
+    aggregates: list[str],
+    feature_names: list[str],
     candles_path: str | None,
     metadata_path: str | None,
 ):
-    db_config = config.config().db
-    if db_config is None:
-        click.secho("You haven't connected a database yet.", fg="red")
-        sys.exit(1)
-
+    db_config = config.get_db_config_or_raise()
     if db_config.instruments.get(instrument):
         click.secho(
             f"{instrument.value.capitalize()} have already been setup.",
@@ -363,13 +412,18 @@ def add_instrument(
 
     if frequency:
         timespan = types.Timespan(frequency)
+        aggregate_timespans = [
+            types.Timespan(aggregate_str) for aggregate_str in aggregates
+        ]
+        migration.add_instrument(
+            instrument,
+            timespan,
+            aggregate_timespans,
+            feature_names,
+            apply=True,
+        )
     else:
-        timespan = None
-
-    db_cmd.add_instrument_migrations(
-        instrument, timespan, allow_prompts=(not timespan)
-    )
-    migration.apply_all(migration.connect(), config.migrations_dir())
+        db_cmd.add_instrument_migrations(instrument, apply=True)
 
     if candles_path and metadata_path:
         db_cmd.import_from_csv(instrument, candles_path, metadata_path)

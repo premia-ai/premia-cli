@@ -1,7 +1,7 @@
 import click
 import os
 from premia.dataprovider import twelvedata, polygon, yfinance
-from premia.utils import config, types
+from premia.utils import config, types, errors
 from premia.db import template, migration
 
 providers_per_instrument = {
@@ -55,102 +55,44 @@ def setup() -> None:
     migration.apply_all(con, migrations_dir)
 
 
-# TODO: Can we cleaner separate the prompting from the non-prompting flow?
-# TODO: Maybe split the function in smaller sub parts
 def add_instrument_migrations(
     instrument: types.InstrumentType,
-    timespan: types.Timespan | None = None,
-    allow_prompts=True,
+    apply=False,
 ) -> None:
-    if not timespan and not allow_prompts:
-        raise types.WizardError(
-            "You need to either set a timespan or allow prompts."
-        )
-
-    if not timespan:
-        timespan_units = [ti.unit for ti in types.timespan_info.values()]
-        timespan_unit = click.prompt(
-            "What is the timespan of your data points?",
-            type=click.Choice(timespan_units),
-        )
-        timespan = types.Timespan(timespan_unit)
-
-    timespan_info = types.timespan_info.get(timespan)
-
-    if timespan_info is None:
-        click.secho("Selected invalid timespan unit.", fg="red")
-        raise click.Abort()
-
-    base_table = f"{instrument.value}_1_{timespan.value}_candles"
-    config.update_instrument_config(
-        instrument,
-        config.InstrumentConfig(
-            base_table=base_table,
-            timespan_unit=timespan.value,
-        ),
+    timespan_values = [t.value for t in types.timespan_info.keys()]
+    timespan_value = click.prompt(
+        "What is the timespan of your data points?",
+        type=click.Choice(timespan_values),
     )
+    timespan = types.Timespan(timespan_value)
+    migration.add_instrument_raw_data(instrument, timespan)
 
-    template.create_migration_file(
-        "add_candles",
-        template.SqlTemplateData(
-            instrument=instrument,
-            quantity=1,
-            timespan=timespan,
-        ),
-    )
-
-    if instrument == types.InstrumentType.STOCKS:
-        template.create_migration_file("add_companies")
-    elif instrument == types.InstrumentType.OPTIONS:
-        template.create_migration_file("add_contracts")
-
-    if not allow_prompts:
-        return
-
+    aggregate_timespan_options = types.timespan_info[timespan].bigger_units
     response = click.prompt(
         f"Do you want to create an aggregate based on your {instrument.value}' raw data?",
-        type=click.Choice(timespan_info.bigger_units + ["no"]),
+        type=click.Choice(aggregate_timespan_options + ["no"]),
     )
     if response != "no":
         aggregate_timespan = types.Timespan(response)
-        if aggregate_timespan is None:
-            click.secho("Invalid aggregate timespan unit selected.", fg="red")
-            raise click.Abort()
+        migration.add_instrument_aggregates(instrument, [aggregate_timespan])
 
-        template.create_migration_file(
-            "add_aggregate_candles",
-            template.SqlTemplateData(
-                instrument=instrument,
-                quantity=1,
-                timespan=aggregate_timespan,
-                reference_table=base_table,
-            ),
-        )
-
-    feature_names = template.get_feature_names()
     response = click.prompt(
         f"Do you want to create a feature table based on your {instrument.value}' raw data?",
-        type=click.Choice(feature_names + ["no"]),
+        type=click.Choice(template.get_feature_names() + ["no"]),
     )
-
     if response != "no":
-        template.create_migration_file(
-            response,
-            template.SqlTemplateData(
-                instrument=instrument,
-                quantity=1,
-                timespan=timespan,
-                reference_table=base_table,
-            ),
-        )
+        migration.add_instrument_features(instrument, [response])
+
+    if apply:
+        migration.apply_all(migration.connect(), config.migrations_dir())
 
 
 # TODO: Move the import logic to a separate module
 def seed():
     try:
-        config.config()
-    except types.ConfigError:
-        raise Exception("Config must be set up to seed DB.")
+        config.get_config()
+    except errors.ConfigError:
+        raise errors.ConfigError("Config must be set up to seed DB.")
 
     response = click.prompt(
         "Do you want to import data?",
@@ -207,16 +149,7 @@ def import_from_csv(
     metadata_csv_path="",
     allow_prompts=True,
 ):
-    db_config = config.config().db
-    if db_config is None:
-        raise types.ConfigError("No database set up yet.")
-
-    instrument_config = db_config.instruments.get(instrument)
-    if instrument_config is None:
-        raise types.ConfigError(
-            f"{instrument.value.capitalize()} have not been set up yet."
-        )
-
+    instrument_config = config.get_instrument_config_or_raise(instrument)
     metadata_table = (
         "contracts"
         if instrument == types.InstrumentType.OPTIONS
@@ -278,14 +211,9 @@ def import_from_twelvedata():
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
-    db_config = config.config().db
-    if db_config is None:
-        raise types.ConfigError("No database set up yet.")
-
-    stocks_config = db_config.instruments.get(types.InstrumentType.STOCKS)
-    if stocks_config is None:
-        raise types.ConfigError("Stocks have not been set up yet.")
-
+    stocks_config = config.get_instrument_config_or_raise(
+        types.InstrumentType.STOCKS
+    )
     twelvedata.import_market_data(
         types.ApiParams(
             symbol=symbol,
@@ -312,14 +240,9 @@ def import_from_yfinance():
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
-    db_config = config.config().db
-    if db_config is None:
-        raise types.ConfigError("No database set up yet.")
-
-    stocks_config = db_config.instruments.get(types.InstrumentType.STOCKS)
-    if stocks_config is None:
-        raise types.ConfigError("Stocks have not been set up yet.")
-
+    stocks_config = config.get_instrument_config_or_raise(
+        types.InstrumentType.STOCKS
+    )
     yfinance.import_market_data(
         types.ApiParams(
             symbol=ticker,
@@ -345,16 +268,7 @@ def import_from_polygon(instrument: types.InstrumentType):
         type=click.DateTime(formats=["%Y-%m-%dT%H:%M:%S"]),
     )
 
-    db_config = config.config().db
-    if db_config is None:
-        raise types.ConfigError("No database set up yet.")
-
-    instrument_config = db_config.instruments.get(instrument)
-    if instrument_config is None:
-        raise types.ConfigError(
-            f"{instrument.value.capitalize()} have not been set up yet."
-        )
-
+    instrument_config = config.get_instrument_config_or_raise(instrument)
     polygon.import_market_data(
         types.ApiParams(
             symbol=symbol,

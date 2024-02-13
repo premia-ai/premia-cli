@@ -2,8 +2,9 @@ from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 from openai import OpenAI
 from premia.db import internals
-from premia.utils import config, types
+from premia.utils import config, errors
 from premia.utils.loader import Loader
+
 
 LOCAL_SYSTEM_PROMPT_TEMPLATE = """
 [INST]
@@ -51,8 +52,7 @@ def setup_remote_model(api_key: str, model_name: str):
 def get_local_model_path(
     link: str | None = None, force_download: bool = False
 ) -> str:
-    ai_config = config.config().ai
-    local_ai_config = ai_config.local if ai_config else None
+    local_ai_config = config.get_local_ai_config()
 
     if link:
         model_id = config.HuggingfaceModelId.parse(link)
@@ -71,9 +71,7 @@ def get_local_model_path(
             cache_dir=config.cache_dir(create_if_missing=True),
         )
     else:
-        raise types.ConfigError(
-            "You need to either pass a model link or have a local model set up in your config."
-        )
+        raise errors.MissingLocalAiError()
 
     return model_path
 
@@ -87,11 +85,7 @@ def create_local_prompt(user_prompt: str) -> str:
 
 
 def create_local_completion(user_prompt: str, verbose: bool) -> str:
-    try:
-        model_path = get_local_model_path()
-    except types.ConfigError:
-        raise types.ConfigError("Please set up a local model using `ai init`.")
-
+    model_path = get_local_model_path()
     model = Llama(
         model_path=model_path,
         n_ctx=8000,
@@ -127,14 +121,12 @@ def create_local_completion(user_prompt: str, verbose: bool) -> str:
 
 
 def create_remote_completion(user_prompt: str, ai_client: OpenAI) -> str:
-    ai_config = config.config().ai
-    if not ai_config or not ai_config.remote:
-        raise types.ConfigError("No remote AI model setup.")
+    remote_ai_config = config.get_remote_ai_config_or_raise()
 
     db_schema = internals.inspect()
     system_prompt = REMOTE_SYSTEM_PROMPT_TEMPLATE.format(db_schema=db_schema)
     stream = ai_client.chat.completions.create(
-        model=ai_config.remote.model,
+        model=remote_ai_config.model,
         stream=True,
         messages=[
             {"role": "system", "content": system_prompt},
