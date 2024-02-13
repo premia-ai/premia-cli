@@ -78,16 +78,16 @@ Instruments:
 
 The `ai` command allows you to setup and use an open source LLM to interact with your infrastructure.
 
-#### `setup`
+#### `set-model`
 
-`setup` allows you to download an open source LLM like Mistral's 7B model or connect to a proprietary model like OpenAI's GPT-4.
+`set-model` allows you to download an open source LLM like Mistral's 7B model or connect to a proprietary model like OpenAI's GPT-4.
 
 **Example**
 
 If you want to set up Mistral 7B you can just run the following command.
 
 ```sh
-$ premia ai setup local "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/blob/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+$ premia ai set-model local "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/blob/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
 ```
 
 **Example**
@@ -97,7 +97,7 @@ If you want to use another open source LLM you can do so by specifying a repo an
 Here another example using Mistral's bigger 8x7B Mixtral model.
 
 ```sh
-$ premia ai setup local "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/blob/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"
+$ premia ai set-model local "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/blob/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"
 ```
 
 **Example**
@@ -105,7 +105,17 @@ $ premia ai setup local "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v
 If you want to set up a remote LLM from OpenAI you can do so as well (the `--model` flag is optional and defaults to `"gpt-3.5-turbo"`)
 
 ```sh
-$ premia ai setup remote "sk-example-api-key" --model "gpt-4"
+$ premia ai set-model remote "sk-example-api-key" --model "gpt-4"
+```
+
+#### `set-preference`
+
+Set the preference for which model should be used for the query executions.
+
+**Example**
+
+```sh
+$ premia set-preference remote
 ```
 
 #### `query`

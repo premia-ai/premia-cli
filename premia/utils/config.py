@@ -257,6 +257,11 @@ def update_ai_config(preference: Literal["local", "remote"]) -> None:
     if not config_file_data.ai:
         raise types.ConfigError("You haven't set up an AI model yet.")
 
+    if getattr(config_file_data.ai, preference) is None:
+        raise types.ConfigError(
+            f"Cannot change the preference to '{preference}'. No {preference} model has been set up."
+        )
+
     config_file_data.ai.preference = preference
     save_config_file(config_file_data)
 

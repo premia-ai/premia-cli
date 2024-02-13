@@ -1,4 +1,5 @@
 from typing import Literal
+import sys
 import click
 from openai import OpenAI
 from premia.ai import model
@@ -49,8 +50,7 @@ Local:
     click.echo(
         f"""\
 Preference: {ai_config.preference}
-{remote_config_str}{local_config_str}
-"""
+{remote_config_str}{local_config_str}"""
     )
 
 
@@ -79,8 +79,7 @@ def config_db():
     click.echo(
         f"""\
 Type: {db_config.type}
-{instruments}
-"""
+{instruments}"""
     )
 
 
@@ -90,12 +89,12 @@ def ai_group():
     pass
 
 
-@ai_group.group("setup")
-def ai_setup():
+@ai_group.group("set-model")
+def ai_set_model():
     """Setup the LLM you want to use with Premia."""
 
 
-@ai_setup.command("local")
+@ai_set_model.command("local")
 @click.argument("link", type=str)
 @click.option(
     "-f",
@@ -104,16 +103,18 @@ def ai_setup():
     is_flag=True,
     help="Force the download of the local model",
 )
-def ai_setup_local(
+def ai_set_model_local(
     link: str,
     force: bool,
 ):
     """Setup a local LLM with a huggingface LINK. The link should point to a model's GGUF file."""
 
     model.get_local_model_path(link, force)
+    config.update_ai_config(preference="local")
+    click.secho("Local model has been set up.", fg="green")
 
 
-@ai_setup.command("remote")
+@ai_set_model.command("remote")
 @click.argument("api_key", type=str)
 @click.option(
     "-m",
@@ -123,19 +124,30 @@ def ai_setup_local(
     help="The OpenAI model you would like to use",
     default="gpt-3.5-turbo",
 )
-def ai_setup_remote(
+def ai_set_model_remote(
     api_key: str,
     model_name: str,
 ):
     """Setup a remote LLM with an OpenAI API_KEY."""
     model.setup_remote_model(api_key, model_name)
+    config.update_ai_config(preference="remote")
+    click.secho("Remote model has been set up.", fg="green")
 
 
-@ai_group.command("preference")
-@click.argument("ai_type", type=click.Choice(["local", "remote"]))
+@ai_group.command("set-preference")
+@click.argument("preference", type=click.Choice(["local", "remote"]))
 def ai_set_preference(preference: Literal["local", "remote"]):
     """Set the preference on whether to use a local or remote model. Check your current setup with `config ai`"""
-    config.update_ai_config(preference)
+    try:
+        config.update_ai_config(preference)
+    except types.ConfigError as e:
+        click.secho(str(e), fg="red")
+        sys.exit(1)
+
+    click.secho(
+        f"Premia will use {preference} model from now on.",
+        fg="green",
+    )
 
 
 @ai_group.command("query")
@@ -145,9 +157,9 @@ def ai_set_preference(preference: Literal["local", "remote"]):
     "--verbose",
     default=False,
     is_flag=True,
-    help="Print the execution of the LLM",
+    help="Print the execution of the LLM. This option only works with the local model.",
 )
-def ai_query(prompt: str, verbose: bool, remote: bool):
+def ai_query(prompt: str, verbose: bool):
     """Query your data with the help of an LLM."""
     ai_config = config.config().ai
     if not ai_config:
