@@ -67,14 +67,14 @@ def config_db():
         if not instruments:
             instruments = "Instruments:\n"
 
-            instruments = (
-                instruments
-                + f"""\
+        instruments = (
+            instruments
+            + f"""\
   {instrument_type.value.capitalize()}:
     Raw Data: {instrument_config.base_table}
     Timespan: {instrument_config.timespan_unit}
 """
-            )
+        )
 
     click.echo(
         f"""\
