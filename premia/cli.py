@@ -573,3 +573,9 @@ def db_reset(yes: bool):
     if yes or click.confirm("Are you sure you want to reset your database?"):
         migration.reset()
         click.secho("Successfully reset the database.", fg="green")
+
+
+@db_group.command("purge")
+def db_purge():
+    migration.remove_ai_responses()
+    click.secho("Successfully removed cached AI responses.", fg="green")

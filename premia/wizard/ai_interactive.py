@@ -1,7 +1,7 @@
 import re
 import click
 from datetime import datetime
-from premia.db import migration, internals
+from premia.db import migration
 
 
 def execute_completion(completion: str):
@@ -19,7 +19,7 @@ def execute_completion(completion: str):
             if click.confirm(
                 "Do you want to store this result for further questions?"
             ):
-                view_name = f"{internals.DB_SCHEMA}.ai_response_{datetime.now().strftime('%Y_%m_%dT%H_%M_%S')}"
+                view_name = f"ai_response_{datetime.now().strftime('%Y_%m_%dT%H_%M_%S')}"
                 relation.create_view(view_name)
                 click.echo(
                     f"The result has been stored as '{view_name}'. You can refer to it in your queries."

@@ -138,6 +138,21 @@ def copy_csv(
         con.commit()
 
 
+def remove_ai_responses(con: duckdb.DuckDBPyConnection | None = None):
+    con = connect() if con is None else con
+    with con.cursor() as cursor:
+        cursor.execute(
+            """
+SELECT table_name
+FROM information_schema.tables
+WHERE table_name LIKE 'ai_response%';
+"""
+        )
+        ai_responses = [ai_response for ai_response, in cursor.fetchall()]
+        for ai_response in ai_responses:
+            cursor.sql(f"DROP VIEW IF EXISTS {ai_response};")
+
+
 def get_migration_version(filename: str) -> str:
     version = filename.split("_")[0]
     return version

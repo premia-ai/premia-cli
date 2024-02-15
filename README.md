@@ -393,10 +393,6 @@ $ premia db remove stocks --aggregate-frequency day
 
 </details>
 
-#### `import`
-
-The `import` command allows to import data from common financial dataproviders (polygon.io, twelvedata.com and yfinance) or a CSV file.
-
 #### `reset`
 
 The `reset` command will delete your whole database and set up a fresh version.
@@ -420,6 +416,20 @@ Are you sure you want to reset your database? [y/N]:
 You can skip the confirmation with `--yes` or `-y`:
 ```sh
 $ premia db reset --yes
+```
+
+</details>
+
+#### `purge`
+
+The `purge` command removes the cached AI responses that you can create.
+
+<details>
+<summary><b>Example</b></summary>
+<br>
+
+```sh
+$ premia db purge
 ```
 
 </details>
