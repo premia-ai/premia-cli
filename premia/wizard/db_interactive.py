@@ -58,26 +58,29 @@ def setup() -> None:
 def add_instrument(
     instrument: types.InstrumentType,
 ) -> None:
-    timespan_values = [t.value for t in types.timespan_info.keys()]
+    timespan_choices = [t.value for t in types.timespan_info.keys()]
     timespan_value = click.prompt(
         "What is the timespan of your data points?",
-        type=click.Choice(timespan_values),
+        type=click.Choice(timespan_choices),
     )
     timespan = types.Timespan(timespan_value)
     migration.add_instrument_raw_data(instrument, timespan)
 
-    aggregate_timespan_options = types.timespan_info[timespan].bigger_units
+    aggregate_timespan_choices = [
+        t.value for t in types.timespan_info[timespan].bigger_timespans
+    ]
     response = click.prompt(
         f"Do you want to create an aggregate based on your {instrument.value}' raw data?",
-        type=click.Choice(aggregate_timespan_options + ["no"]),
+        type=click.Choice(aggregate_timespan_choices + ["no"]),
     )
     if response != "no":
         aggregate_timespan = types.Timespan(response)
         migration.add_instrument_aggregates(instrument, {aggregate_timespan})
 
+    feature_name_choices = list(template.get_feature_names())
     response = click.prompt(
         f"Do you want to create a feature table based on your {instrument.value}' raw data?",
-        type=click.Choice(list(template.get_feature_names()) + ["no"]),
+        type=click.Choice(feature_name_choices + ["no"]),
     )
     if response != "no":
         migration.add_instrument_features(instrument, {response})
@@ -141,6 +144,7 @@ def import_data(
 
 
 # TODO: Move the import logic to a separate module
+# TODO: Is this a duplication of `premia/db/data_import.py`?
 def import_from_csv(
     instrument: types.InstrumentType,
     candles_csv_path="",

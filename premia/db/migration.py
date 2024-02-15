@@ -200,13 +200,13 @@ def add_instrument_aggregates(
         instrument_config.aggregate_timespans
     )
 
-    allowed_timespan_values = types.timespan_info[
+    allowed_timespans = types.timespan_info[
         instrument_config.timespan
-    ].bigger_units
+    ].bigger_timespans
 
     unapplied_migration_files = 0
     for aggregate_timespan in new_aggregate_timespans:
-        if aggregate_timespan.value not in allowed_timespan_values:
+        if aggregate_timespan not in allowed_timespans:
             # TODO: Create cleanup function that removes not-applied migrations on a MigrationError
             raise errors.MigrationError(
                 f"Cannot add a {instrument.value} aggregate table with the frequency '{aggregate_timespan.value}' for raw data with the frequency '{instrument_config.timespan.value}'."

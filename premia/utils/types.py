@@ -26,7 +26,7 @@ class TimespanInfo:
     twelvedata_code: str | None
     yfinance_code: str | None
     unit: str
-    bigger_units: list[str]
+    bigger_timespans: list[Timespan]
 
 
 timespan_info: dict[Timespan, TimespanInfo] = {
@@ -35,12 +35,12 @@ timespan_info: dict[Timespan, TimespanInfo] = {
         twelvedata_code=None,
         yfinance_code=None,
         unit=Timespan.SECOND.value,
-        bigger_units=[
-            Timespan.MINUTE.value,
-            Timespan.HOUR.value,
-            Timespan.DAY.value,
-            Timespan.WEEK.value,
-            Timespan.MONTH.value,
+        bigger_timespans=[
+            Timespan.MINUTE,
+            Timespan.HOUR,
+            Timespan.DAY,
+            Timespan.WEEK,
+            Timespan.MONTH,
         ],
     ),
     Timespan.MINUTE: TimespanInfo(
@@ -48,11 +48,11 @@ timespan_info: dict[Timespan, TimespanInfo] = {
         twelvedata_code="min",
         yfinance_code="m",
         unit=Timespan.MINUTE.value,
-        bigger_units=[
-            Timespan.HOUR.value,
-            Timespan.DAY.value,
-            Timespan.WEEK.value,
-            Timespan.MONTH.value,
+        bigger_timespans=[
+            Timespan.HOUR,
+            Timespan.DAY,
+            Timespan.WEEK,
+            Timespan.MONTH,
         ],
     ),
     Timespan.HOUR: TimespanInfo(
@@ -60,10 +60,10 @@ timespan_info: dict[Timespan, TimespanInfo] = {
         twelvedata_code="h",
         yfinance_code="h",
         unit=Timespan.HOUR.value,
-        bigger_units=[
-            Timespan.DAY.value,
-            Timespan.WEEK.value,
-            Timespan.MONTH.value,
+        bigger_timespans=[
+            Timespan.DAY,
+            Timespan.WEEK,
+            Timespan.MONTH,
         ],
     ),
     Timespan.DAY: TimespanInfo(
@@ -71,21 +71,21 @@ timespan_info: dict[Timespan, TimespanInfo] = {
         twelvedata_code="day",
         yfinance_code="d",
         unit=Timespan.DAY.value,
-        bigger_units=[Timespan.WEEK.value, Timespan.MONTH.value],
+        bigger_timespans=[Timespan.WEEK, Timespan.MONTH],
     ),
     Timespan.WEEK: TimespanInfo(
         one_letter_code="w",
         twelvedata_code="week",
         yfinance_code="wk",
         unit=Timespan.WEEK.value,
-        bigger_units=[Timespan.MONTH.value],
+        bigger_timespans=[Timespan.MONTH],
     ),
     Timespan.MONTH: TimespanInfo(
         one_letter_code="M",
         twelvedata_code="month",
         yfinance_code="mo",
         unit=Timespan.MONTH.value,
-        bigger_units=[],
+        bigger_timespans=[],
     ),
 }
 
