@@ -12,9 +12,11 @@ CONFIG_DIR = ".premia"
 MIGRATIONS_DIR = f"{CONFIG_DIR}/migrations"
 CACHE_DIR = f"{CONFIG_DIR}/cache"
 CONFIG_FILE_NAME = "config.json"
-CONFIG_FILE_PATH = f"~/{CONFIG_DIR}/{CONFIG_FILE_NAME}"
+CONFIG_FILE_PATH = os.path.expanduser(f"~/{CONFIG_DIR}/{CONFIG_FILE_NAME}")
 DEFAULT_DATABASE_FILE_NAME = "securities.db"
-DEFAULT_DATABASE_PATH = f"~/{CONFIG_DIR}/{DEFAULT_DATABASE_FILE_NAME}"
+DEFAULT_DATABASE_PATH = os.path.expanduser(
+    f"~/{CONFIG_DIR}/{DEFAULT_DATABASE_FILE_NAME}"
+)
 
 
 def get_dir(dir_path: str, create_if_missing=False) -> str:
@@ -86,8 +88,8 @@ class InstrumentConfig:
     base_table: str
     metadata_table: str
     timespan: types.Timespan
-    feature_names: list[str] = field(default_factory=list)
-    aggregate_timespans: list[types.Timespan] = field(default_factory=list)
+    feature_names: set[str] = field(default_factory=set)
+    aggregate_timespans: set[types.Timespan] = field(default_factory=set)
 
     @classmethod
     def from_dict(cls, data_dict: dict):
@@ -95,11 +97,11 @@ class InstrumentConfig:
             base_table=data_dict["base_table"],
             metadata_table=data_dict["metadata_table"],
             timespan=types.Timespan(data_dict["timespan"]),
-            aggregate_timespans=[
+            aggregate_timespans={
                 types.Timespan(t)
                 for t in data_dict.get("aggregate_timespans", [])
-            ],
-            feature_names=data_dict.get("feature_names", []),
+            },
+            feature_names=set(data_dict.get("feature_names", [])),
         )
 
     def to_dict(self) -> dict:
@@ -108,7 +110,7 @@ class InstrumentConfig:
             "base_table": self.base_table,
             "metadata_table": self.metadata_table,
             "aggregate_timespans": [t.value for t in self.aggregate_timespans],
-            "feature_names": self.feature_names.copy(),
+            "feature_names": list(self.feature_names),
         }
 
 
@@ -257,8 +259,8 @@ def update_instrument_config(
     timespan: types.Timespan | None = None,
     base_table: str | None = None,
     metadata_table: str | None = None,
-    aggregate_timespans: list[types.Timespan] | None = None,
-    feature_names: list[str] | None = None,
+    aggregate_timespans: set[types.Timespan] | None = None,
+    feature_names: set[str] | None = None,
 ) -> None:
     config_file_data = get_config()
     if config_file_data.db is None:
@@ -273,8 +275,8 @@ def update_instrument_config(
             timespan=timespan,
             base_table=base_table,
             metadata_table=metadata_table,
-            aggregate_timespans=aggregate_timespans or [],
-            feature_names=feature_names or [],
+            aggregate_timespans=aggregate_timespans or set(),
+            feature_names=feature_names or set(),
         )
     else:
         if base_table:
@@ -472,7 +474,7 @@ def get_config(create_if_missing=False) -> ConfigFileData:
 
 def get_config_file_path(create_if_missing=False) -> str:
     config_dir(create_if_missing)
-    config_file_path = os.path.expanduser(CONFIG_FILE_PATH)
+    config_file_path = CONFIG_FILE_PATH
 
     if not os.path.exists(config_file_path):
         if not create_if_missing:

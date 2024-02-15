@@ -1,19 +1,25 @@
 from premia.utils import types
 
 
+class PremiaError(Exception):
+    """Curstom exception class for Premia errors that should be caught."""
+
+    pass
+
+
 class InternalError(Exception):
     """Curstom exception class for errors that happen in Premia internal processes without user influence."""
 
     pass
 
 
-class MigrationError(Exception):
+class MigrationError(PremiaError):
     """Custom exception class for migration errors."""
 
     pass
 
 
-class ConfigError(Exception):
+class ConfigError(PremiaError):
     """Custom exception class for config directory related errors."""
 
     pass

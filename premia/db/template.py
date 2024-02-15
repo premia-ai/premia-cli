@@ -31,7 +31,7 @@ def parse_feature_name(file_name: str) -> str:
     return match.group("feature_name")
 
 
-def get_feature_names() -> list[str]:
+def get_feature_names() -> set[str]:
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
     template_features_path = os.path.join(
         current_script_directory, "..", "..", "templates", "features"
@@ -42,11 +42,9 @@ def get_feature_names() -> list[str]:
     except OSError as err:
         raise Exception(f"Error reading directory: {err}")
 
-    feature_names = []
+    feature_names = set()
     for feature_file_name in feature_file_names:
-        # Feature templates can have "remove" migrations as well
-        if feature_file_name.startswith("add"):
-            feature_names.append(parse_feature_name(feature_file_name))
+        feature_names.add(parse_feature_name(feature_file_name))
 
     return feature_names
 

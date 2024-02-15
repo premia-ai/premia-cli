@@ -38,7 +38,7 @@ def setup(con: duckdb.DuckDBPyConnection) -> None:
     with con.cursor() as cursor:
         cursor.execute(
             """
-            CREATE SCHEMA premia;
+            CREATE SCHEMA IF NOT EXISTS premia;
         """
         )
         cursor.execute(
@@ -118,7 +118,7 @@ def reset() -> None:
     try:
         config.remove_db_or_raise()
     except Exception as e:
-        errors.MigrationError(
+        raise errors.MigrationError(
             f"An error occurred while reseting your database at '{db_config.path}': {e}"
         )
 
@@ -192,15 +192,13 @@ def add_instrument_raw_data(
 
 def add_instrument_aggregates(
     instrument: types.InstrumentType,
-    aggregate_timespans: list[types.Timespan],
+    aggregate_timespans: set[types.Timespan],
     apply=False,
 ) -> int:
     instrument_config = config.get_instrument_config_or_raise(instrument)
-    new_aggregate_timespans = [
-        aggregate_timespan
-        for aggregate_timespan in aggregate_timespans
-        if aggregate_timespan not in instrument_config.aggregate_timespans
-    ]
+    new_aggregate_timespans = aggregate_timespans.difference(
+        instrument_config.aggregate_timespans
+    )
 
     allowed_timespan_values = types.timespan_info[
         instrument_config.timespan
@@ -229,7 +227,7 @@ def add_instrument_aggregates(
     if apply and unapplied_migration_files > 0:
         apply_all(connect(), config.migrations_dir())
         all_aggregate_timespans = (
-            instrument_config.aggregate_timespans + new_aggregate_timespans
+            instrument_config.aggregate_timespans | new_aggregate_timespans
         )
         config.update_instrument_config(
             instrument=instrument, aggregate_timespans=all_aggregate_timespans
@@ -240,14 +238,12 @@ def add_instrument_aggregates(
 
 
 def add_instrument_features(
-    instrument: types.InstrumentType, feature_names: list[str], apply=False
+    instrument: types.InstrumentType, feature_names: set[str], apply=False
 ) -> int:
     instrument_config = config.get_instrument_config_or_raise(instrument)
-    new_feature_names = [
-        feature_name
-        for feature_name in feature_names
-        if feature_name not in instrument_config.feature_names
-    ]
+    new_feature_names = feature_names.difference(
+        instrument_config.feature_names
+    )
 
     allowed_feature_names = template.get_feature_names()
 
@@ -273,7 +269,7 @@ def add_instrument_features(
 
     if apply and unapplied_migration_files > 0:
         apply_all(connect(), config.migrations_dir())
-        all_feature_names = instrument_config.feature_names + new_feature_names
+        all_feature_names = instrument_config.feature_names | new_feature_names
         config.update_instrument_config(
             instrument=instrument, feature_names=all_feature_names
         )
@@ -285,8 +281,8 @@ def add_instrument_features(
 def add_instrument(
     instrument: types.InstrumentType,
     timespan: types.Timespan,
-    aggregate_timespans: list[types.Timespan] = [],
-    feature_names: list[str] = [],
+    aggregate_timespans: set[types.Timespan] = set(),
+    feature_names: set[str] = set(),
     apply=False,
 ) -> int:
     unapplied_migration_files = 0
@@ -304,8 +300,8 @@ def add_instrument(
 
 def update_instrument(
     instrument: types.InstrumentType,
-    aggregate_timespans: list[types.Timespan] | None = None,
-    feature_names: list[str] | None = None,
+    aggregate_timespans: set[types.Timespan] | None = None,
+    feature_names: set[str] | None = None,
     apply=False,
 ) -> int:
     unapplied_migration_files = 0
@@ -322,7 +318,7 @@ def update_instrument(
 
 def remove_instrument_features(
     instrument: types.InstrumentType,
-    feature_names: list[str] | None = None,
+    feature_names: set[str] | None = None,
     apply=False,
 ) -> int:
     instrument_config = config.get_instrument_config_or_raise(instrument)
@@ -353,8 +349,8 @@ def remove_instrument_features(
 
     if apply and unapplied_migration_files > 0:
         apply_all(connect(), config.migrations_dir())
-        feature_names_left = list(
-            set(instrument_config.feature_names) - set(feature_names_to_remove)
+        feature_names_left = (
+            instrument_config.feature_names - feature_names_to_remove
         )
         config.update_instrument_config(
             instrument=instrument, feature_names=feature_names_left
@@ -366,7 +362,7 @@ def remove_instrument_features(
 
 def remove_instrument_aggregates(
     instrument: types.InstrumentType,
-    aggregate_timespans: list[types.Timespan] | None = None,
+    aggregate_timespans: set[types.Timespan] | None = None,
     apply=False,
 ) -> int:
     instrument_config = config.get_instrument_config_or_raise(instrument)
@@ -398,9 +394,9 @@ def remove_instrument_aggregates(
 
     if apply and unapplied_migration_files > 0:
         apply_all(connect(), config.migrations_dir())
-        aggregate_timespans_left = list(
-            set(instrument_config.aggregate_timespans)
-            - set(aggregate_timespans_to_remove)
+        aggregate_timespans_left = (
+            instrument_config.aggregate_timespans
+            - aggregate_timespans_to_remove
         )
         config.update_instrument_config(
             instrument=instrument, aggregate_timespans=aggregate_timespans_left

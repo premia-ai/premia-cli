@@ -18,6 +18,8 @@ INSTRUMENT_CHOICES = [
     types.InstrumentType.OPTIONS.value,
 ]
 
+FEATURE_NAME_CHOICES = list(template.get_feature_names())
+
 PROVIDER_CHOICES = [types.DataProvider.CSV.value]
 AI_MODEL_CHOICES: list[types.AiModel] = ["local", "remote"]
 
@@ -398,8 +400,9 @@ def db_table(table_name: str):
     con.sql(f"FROM {table_name};").show()
 
 
-@db_group.command("available-features")
-def db_available_features():
+@db_group.command("features")
+def db_features():
+    """Prints a list of available features to stdout."""
     click.echo("\n".join(template.get_feature_names()))
 
 
@@ -432,7 +435,7 @@ def db_available_features():
     "feature_names",
     multiple=True,
     help="Create feature tables based on original data table",
-    type=click.Choice(template.get_feature_names()),
+    type=click.Choice(FEATURE_NAME_CHOICES),
 )
 @click.option(
     "-i",
@@ -451,6 +454,8 @@ def db_add(
     """
     Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init` otherwise.
     """
+    unique_aggregate_timespans = set(aggregate_timespans)
+    unique_feature_names = set(feature_names)
     if interactive:
         db_interactive.add_instrument(instrument)
     elif timespan:
@@ -458,12 +463,13 @@ def db_add(
             migration.add_instrument(
                 instrument,
                 timespan,
-                aggregate_timespans,
-                feature_names,
+                unique_aggregate_timespans,
+                unique_feature_names,
                 apply=True,
             )
         except errors.MigrationError as e:
             click.secho(e, fg="red")
+            sys.exit(1)
 
         click.secho(
             f"Successfully set up {instrument.value}.",
@@ -473,12 +479,13 @@ def db_add(
         try:
             migration.update_instrument(
                 instrument,
-                aggregate_timespans,
-                feature_names,
+                unique_aggregate_timespans,
+                unique_feature_names,
                 apply=True,
             )
-        except errors.MigrationError as e:
+        except errors.PremiaError as e:
             click.secho(e, fg="red")
+            sys.exit(1)
 
         click.secho(
             f"Successfully updated {instrument.value}.",
@@ -507,7 +514,7 @@ def db_add(
     "feature_names",
     multiple=True,
     help="Remove feature tables that you have created previously.",
-    type=click.Choice(template.get_feature_names()),
+    type=click.Choice(FEATURE_NAME_CHOICES),
 )
 def db_remove(
     instrument: types.InstrumentType,
@@ -515,10 +522,15 @@ def db_remove(
     feature_names: list[str],
 ):
     """Remove an instrument that you have set up with Premia."""
+    unique_feature_names = set(feature_names)
+    unique_aggregate_timespans = set(aggregate_timespans)
     # TODO: Can this be simplified? It seems awkward
     # TODO: The success messages are kind of lazy. We should give more details.
     try:
-        if len(aggregate_timespans) == 0 and len(feature_names) == 0:
+        if (
+            len(unique_aggregate_timespans) == 0
+            and len(unique_feature_names) == 0
+        ):
             migration.remove_instrument(instrument, apply=True)
             click.secho(
                 f"Successfully removed {instrument.value} from your system.",
@@ -526,17 +538,19 @@ def db_remove(
             )
             return
 
-        if len(aggregate_timespans) > 0:
+        if len(unique_aggregate_timespans) > 0:
             migration.remove_instrument_aggregates(
-                instrument, aggregate_timespans=aggregate_timespans, apply=True
+                instrument,
+                aggregate_timespans=unique_aggregate_timespans,
+                apply=True,
             )
             click.secho(
                 f"Successfully removed {instrument.value}' aggregate tables from your system.",
                 fg="green",
             )
-        if len(feature_names) > 0:
+        if len(unique_feature_names) > 0:
             migration.remove_instrument_features(
-                instrument, feature_names=feature_names, apply=True
+                instrument, feature_names=unique_feature_names, apply=True
             )
             click.secho(
                 f"Successfully removed {instrument.value}' feature tables from your system.",

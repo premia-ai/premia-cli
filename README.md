@@ -309,16 +309,16 @@ $ premia db table contracts
 
 </details>
 
-#### `available-features`
+#### `features`
 
-The `available-features` command lists all of the features that you can set up for an instrument.
+The `features` command lists all of the features that you can set up for an instrument.
 
 <details>
 <summary><b>Example</b></summary>
 <br>
 
 ```sh
-$ premia db available-features
+$ premia db features
 
 moving_averages
 returns
