@@ -37,18 +37,20 @@ $ bin/install.sh
 
 ## Commands
 
-### `config`
+### `ai`
 
-#### `ai`
+The `ai` command allows you to setup and use an open source LLM to interact with your infrastructure.
 
-Show the AI configuration
+#### `config`
+
+Show the AI configuration.
 
 <details>
 <summary><b>Example</b></summary>
 <br>
 
 ```sh
-$ premia config ai
+$ premia ai config
 
 Preference: local
 Remote:
@@ -64,33 +66,9 @@ Local:
 
 </details>
 
-#### `db`
+#### `add`
 
-Show the database configuration
-
-<details>
-<summary><b>Example</b></summary>
-<br>
-
-```sh
-$ premia config db
-
-Type: DuckDB
-Instruments:
-  Stocks:
-    Raw Data: stocks_1_minute_candles
-    Timespan: minute
-```
-
-</details>
-
-### `ai`
-
-The `ai` command allows you to setup and use an open source LLM to interact with your infrastructure.
-
-#### `set-model`
-
-`set-model` allows you to download an open source LLM like Mistral's 7B model or connect to a proprietary model like OpenAI's GPT-4.
+`add` allows you to download an open source LLM like Mistral's 7B model or connect to a proprietary model like OpenAI's GPT-4.
 
 <details>
 <summary><b>Example: Set up open source model</b></summary>
@@ -102,10 +80,10 @@ You can use any other open source LLM. Just copy the link to the GGUF file from 
 
 ```sh
 # For Mistral 7B
-$ premia ai set-model local "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/blob/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
+$ premia ai add local "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/blob/main/mistral-7b-instruct-v0.2.Q4_K_M.gguf"
 
 # For Mixtral 8x7B
-$ premia ai set-model local "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/blob/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"
+$ premia ai add local "https://huggingface.co/TheBloke/Mixtral-8x7B-Instruct-v0.1-GGUF/blob/main/mixtral-8x7b-instruct-v0.1.Q4_K_M.gguf"
 ```
 
 </details>
@@ -118,15 +96,15 @@ If you want to set up a remote LLM from OpenAI you can do so as well. With the `
 
 ```sh
 # For GPT-3.5 Turbo (default)
-$ premia ai set-model remote "sk-example-api-key"
+$ premia ai add remote "sk-example-api-key"
 
 # For GPT-4
-$ premia ai set-model remote "sk-example-api-key" --model "gpt-4"
+$ premia ai add remote "sk-example-api-key" --model "gpt-4"
 ```
 
 </details>
 
-#### `set-preference`
+#### `preference`
 
 Set the preference for which model should be used for the query executions.
 
@@ -136,10 +114,26 @@ Set the preference for which model should be used for the query executions.
 
 
 ```sh
-$ premia set-preference remote
+$ premia ai preference remote
 ```
 
 </details>
+
+#### `remove`
+
+`remove` lets you remove a model that you have set up previously. Just specify whether you want to remove the `local` or `remote` model.
+
+<details>
+<summary><b>Example</b></summary>
+<br>
+
+
+```sh
+$ premia ai remove remote
+```
+
+</details>
+
 
 #### `query`
 
@@ -165,6 +159,26 @@ WHERE companies.name = 'Tesla Inc.' AND EXTRACT(YEAR FROM stocks_1_day_candles.b
 ### `db`
 
 The `db` command allows to setup or interact with an SQL database for financial data.
+
+#### `config`
+
+Show the database configuration.
+
+<details>
+<summary><b>Example</b></summary>
+<br>
+
+```sh
+$ premia db config
+
+Type: DuckDB
+Instruments:
+  Stocks:
+    Metadata Table: companies
+    Timespan: minute
+```
+
+</details>
 
 #### `init`
 
@@ -313,9 +327,102 @@ volume_changes
 
 </details>
 
+#### `add`
+
+The `add` command allows to conveniently specify how you want to set up an instrument, and which featues and aggregates you would like to add.
+
+You can add a new instrument or add new tables to an instrument by specifying `--feature` or `--aggregate-frequency`.
+
+<details>
+<summary><b>Example: Add stock tables</b></summary>
+<br>
+
+```sh
+$ premia db add stocks --raw-frequency second
+```
+
+</details>
+
+
+<details>
+<summary><b>Example: Add aggregate tables to existing stock setup</b></summary>
+<br>
+
+```sh
+$ premia db add stocks --aggregate-frequency hour --aggregate-frequency day
+```
+
+</details>
+
+#### `import`
+
+You can import CSV data for your instruments using `import`.
+
+<details>
+<summary><b>Example: Using the sample data in the repo</b></summary>
+<br>
+
+```sh
+$ premia db import stocks --candles-path ./sample_data/sample_stocks_1_minute_candles.csv --metadata-path ./sample_data/sample_companies.csv
+```
+
+</details>
+
+
+#### `remove`
+
+The `remove` command allows to remove tables you have set up with Premia.
+
+<details>
+<summary><b>Example: Remove instrument</b></summary>
+<br>
+
+```sh
+$ premia db remove stocks
+```
+
+</details>
+
+<details>
+<summary><b>Example: Remove aggregate table for an instrument</b></summary>
+<br>
+
+```sh
+$ premia db remove stocks --aggregate-frequency day
+```
+
+</details>
+
 #### `import`
 
 The `import` command allows to import data from common financial dataproviders (polygon.io, twelvedata.com and yfinance) or a CSV file.
+
+#### `reset`
+
+The `reset` command will delete your whole database and set up a fresh version.
+
+<details>
+<summary><b>Example: With confirmation</b></summary>
+<br>
+
+```sh
+$ premia db reset
+
+Are you sure you want to reset your database? [y/N]:
+```
+
+</details>
+
+<details>
+<summary><b>Example: Without confirmation</b></summary>
+<br>
+
+You can skip the confirmation with `--yes` or `-y`:
+```sh
+$ premia db reset --yes
+```
+
+</details>
 
 ## For contributors
 

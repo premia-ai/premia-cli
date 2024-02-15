@@ -20,12 +20,12 @@ providers_per_instrument = {
 
 def setup() -> None:
     if click.confirm("Do you want to set up a new database for Premia?"):
-        config.update_db_config()
+        config.create_db_config()
     else:
         db_path = click.prompt(
             "What is the path to your existing DuckDB database?"
         )
-        config.update_db_config(db_path)
+        config.create_db_config(db_path)
 
     migrations_dir = config.migrations_dir(True)
 
@@ -45,19 +45,18 @@ def setup() -> None:
         return
 
     if answer == types.InstrumentType.STOCKS.value or answer == "both":
-        add_instrument_migrations(types.InstrumentType.STOCKS)
+        add_instrument(types.InstrumentType.STOCKS)
 
     if answer == types.InstrumentType.OPTIONS.value or answer == "both":
-        add_instrument_migrations(types.InstrumentType.OPTIONS)
+        add_instrument(types.InstrumentType.OPTIONS)
 
-    con = migration.connect()
+    con = migration.connect(create_if_missing=True)
     migration.setup(con)
     migration.apply_all(con, migrations_dir)
 
 
-def add_instrument_migrations(
+def add_instrument(
     instrument: types.InstrumentType,
-    apply=False,
 ) -> None:
     timespan_values = [t.value for t in types.timespan_info.keys()]
     timespan_value = click.prompt(
@@ -83,11 +82,9 @@ def add_instrument_migrations(
     if response != "no":
         migration.add_instrument_features(instrument, [response])
 
-    if apply:
-        migration.apply_all(migration.connect(), config.migrations_dir())
+    migration.apply_all(migration.connect(), config.migrations_dir())
 
 
-# TODO: Move the import logic to a separate module
 def seed():
     try:
         config.get_config()
@@ -143,6 +140,7 @@ def import_data(
         raise types.WizardError(e)
 
 
+# TODO: Move the import logic to a separate module
 def import_from_csv(
     instrument: types.InstrumentType,
     candles_csv_path="",
@@ -174,7 +172,7 @@ def import_from_csv(
     base_table_columns = migration.columns(instrument_config.base_table)
     candles_csv_path = click.prompt(
         f"""
-What is the path to your {instrument.value}' 1 {instrument_config.timespan_unit} candles CSV file?
+What is the path to your {instrument.value}' 1 {instrument_config.timespan} candles CSV file?
 (The CSV must define the following columns: {', '.join(base_table_columns)})
         """.strip()
     )
@@ -217,7 +215,7 @@ def import_from_twelvedata():
     twelvedata.import_market_data(
         types.ApiParams(
             symbol=symbol,
-            timespan=types.Timespan(stocks_config.timespan_unit),
+            timespan=types.Timespan(stocks_config.timespan),
             quantity=1,
             start=start,
             end=end,
@@ -246,7 +244,7 @@ def import_from_yfinance():
     yfinance.import_market_data(
         types.ApiParams(
             symbol=ticker,
-            timespan=types.Timespan(stocks_config.timespan_unit),
+            timespan=types.Timespan(stocks_config.timespan),
             quantity=1,
             start=start,
             end=end,
@@ -274,7 +272,7 @@ def import_from_polygon(instrument: types.InstrumentType):
             symbol=symbol,
             start=start,
             end=end,
-            timespan=types.Timespan(instrument_config.timespan_unit),
+            timespan=types.Timespan(instrument_config.timespan),
             quantity=1,
             table=instrument_config.base_table,
         )

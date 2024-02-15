@@ -196,12 +196,6 @@ class AiError(Exception):
     pass
 
 
-class MigrationError(Exception):
-    """Custom exception class for migration errors."""
-
-    pass
-
-
 class WizardError(Exception):
     """Custom exception class for errors that occur during wizard flows."""
 

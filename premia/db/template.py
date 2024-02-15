@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import time
 import os
 import re
-from premia.utils import config, types
+from premia.utils import config, types, errors
 
 
 @dataclass
@@ -22,23 +22,33 @@ class SqlTemplateData:
         }
 
 
+def parse_feature_name(file_name: str) -> str:
+    template_regex = r"(?P<action>add_|remove_)(?P<feature_name>.*)(?P<extension>.template.sql)"
+
+    match = re.search(template_regex, file_name)
+    if match is None:
+        raise errors.InternalError()
+    return match.group("feature_name")
+
+
 def get_feature_names() -> list[str]:
-    template_extension = ".template.sql"
     current_script_directory = os.path.dirname(os.path.abspath(__file__))
     template_features_path = os.path.join(
         current_script_directory, "..", "..", "templates", "features"
     )
 
     try:
-        entries = os.listdir(template_features_path)
+        feature_file_names = os.listdir(template_features_path)
     except OSError as err:
         raise Exception(f"Error reading directory: {err}")
 
-    names = []
-    for entry in entries:
-        names.append(entry.replace(template_extension, "", 1))
+    feature_names = []
+    for feature_file_name in feature_file_names:
+        # Feature templates can have "remove" migrations as well
+        if feature_file_name.startswith("add"):
+            feature_names.append(parse_feature_name(feature_file_name))
 
-    return names
+    return feature_names
 
 
 def create_migration_name(template_name: str, version: int) -> str:

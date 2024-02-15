@@ -1,12 +1,17 @@
 import os
 from typing import cast
 import duckdb
-from premia.utils import types, config
+from premia.utils import types, config, errors
 from premia.db import template
 
 
-def connect() -> duckdb.DuckDBPyConnection:
-    db_config = config.get_db_config_or_raise()
+def connect(create_if_missing=False) -> duckdb.DuckDBPyConnection:
+    db_config = config.get_db_config()
+    if not db_config and create_if_missing:
+        db_config = config.create_db_config()
+    elif not db_config:
+        raise errors.MissingDbError()
+
     return duckdb.connect(db_config.path)
 
 
@@ -57,16 +62,22 @@ def apply(con: duckdb.DuckDBPyConnection, file_path: str) -> None:
                 cursor.execute(
                     """
                     INSERT INTO premia.schema_migrations (version, applied)
-                    VALUES (?, TRUE)
-                    ON CONFLICT (version) DO UPDATE SET applied = TRUE;
+                    VALUES (?, TRUE);
                 """,
                     [version],
                 )
                 con.commit()
             except Exception as e:
-                # con.rollback()
-                raise types.MigrationError(
-                    f"Error applying migration {file_path}: {e}"
+                cursor.execute(
+                    """
+                    INSERT INTO premia.schema_migrations (version, applied)
+                    VALUES (?, FALSE);
+                """,
+                    [version],
+                )
+                con.commit()
+                raise errors.MigrationError(
+                    f"Error applying migration {file_path}: {e}. You need to fix the migration before applying further ones."
                 )
 
 
@@ -104,16 +115,14 @@ def apply_all(con: duckdb.DuckDBPyConnection, directory: str) -> None:
 
 def reset() -> None:
     db_config = config.get_db_config_or_raise()
-
     try:
-        os.remove(db_config.path)
+        config.remove_db_or_raise()
     except Exception as e:
-        print(
-            f"An error occurred while deleting the DB at '{db_config.path}': {e}"
+        errors.MigrationError(
+            f"An error occurred while reseting your database at '{db_config.path}': {e}"
         )
 
-    con = connect()
-    setup(con)
+    setup(connect(create_if_missing=True))
 
 
 def copy_csv(
@@ -134,12 +143,28 @@ def get_migration_version(filename: str) -> str:
     return version
 
 
+def get_instrument_base_table(
+    instrument: types.InstrumentType, timespan: types.Timespan
+) -> str:
+    return f"{instrument.value}_1_{timespan.value}_candles"
+
+
+def get_instrument_metadata_table(instrument: types.InstrumentType) -> str:
+    if instrument == types.InstrumentType.OPTIONS:
+        return "contracts"
+    else:
+        return "companies"
+
+
 def add_instrument_raw_data(
     instrument: types.InstrumentType,
     timespan: types.Timespan,
     apply=False,
-):
-    base_table = f"{instrument.value}_1_{timespan.value}_candles"
+) -> int:
+    if config.get_instrument_config(instrument):
+        raise errors.MigrationError(
+            f"Instrument {instrument} has already been set up"
+        )
 
     template.create_migration_file(
         "add_candles",
@@ -150,35 +175,43 @@ def add_instrument_raw_data(
         ),
     )
 
-    instrument_config = config.InstrumentConfig(
-        base_table=base_table,
-        timespan_unit=timespan.value,
-    )
-
-    config.update_instrument_config(instrument, instrument_config)
-
-    if instrument == types.InstrumentType.STOCKS:
-        template.create_migration_file("add_companies")
-    elif instrument == types.InstrumentType.OPTIONS:
-        template.create_migration_file("add_contracts")
+    metadata_table = get_instrument_metadata_table(instrument)
+    template.create_migration_file(f"add_{metadata_table}")
 
     if apply:
         apply_all(connect(), config.migrations_dir())
+        config.update_instrument_config(
+            instrument=instrument,
+            timespan=timespan,
+            base_table=get_instrument_base_table(instrument, timespan),
+            metadata_table=metadata_table,
+        )
+        return 0
+    return 2
 
 
 def add_instrument_aggregates(
     instrument: types.InstrumentType,
-    timespans: list[types.Timespan],
+    aggregate_timespans: list[types.Timespan],
     apply=False,
-) -> None:
+) -> int:
     instrument_config = config.get_instrument_config_or_raise(instrument)
-    raw_data_timespan = types.Timespan(instrument_config.timespan_unit)
-    raw_data_timespan_info = types.timespan_info[raw_data_timespan]
+    new_aggregate_timespans = [
+        aggregate_timespan
+        for aggregate_timespan in aggregate_timespans
+        if aggregate_timespan not in instrument_config.aggregate_timespans
+    ]
 
-    for timespan in timespans:
-        if timespan not in raw_data_timespan_info.bigger_units:
-            raise types.MigrationError(
-                f"Cannot add a {instrument.value} aggregate table with the frequency '{timespan.value}' for raw data with the frequency '{raw_data_timespan.value}'."
+    allowed_timespan_values = types.timespan_info[
+        instrument_config.timespan
+    ].bigger_units
+
+    unapplied_migration_files = 0
+    for aggregate_timespan in new_aggregate_timespans:
+        if aggregate_timespan.value not in allowed_timespan_values:
+            # TODO: Create cleanup function that removes not-applied migrations on a MigrationError
+            raise errors.MigrationError(
+                f"Cannot add a {instrument.value} aggregate table with the frequency '{aggregate_timespan.value}' for raw data with the frequency '{instrument_config.timespan.value}'."
             )
 
         template.create_migration_file(
@@ -186,24 +219,43 @@ def add_instrument_aggregates(
             template.SqlTemplateData(
                 instrument=instrument,
                 quantity=1,
-                timespan=timespan,
+                timespan=aggregate_timespan,
                 reference_table=instrument_config.base_table,
             ),
         )
 
-    if apply:
+        unapplied_migration_files += 1
+
+    if apply and unapplied_migration_files > 0:
         apply_all(connect(), config.migrations_dir())
+        all_aggregate_timespans = (
+            instrument_config.aggregate_timespans + new_aggregate_timespans
+        )
+        config.update_instrument_config(
+            instrument=instrument, aggregate_timespans=all_aggregate_timespans
+        )
+        return 0
+
+    return unapplied_migration_files
 
 
 def add_instrument_features(
     instrument: types.InstrumentType, feature_names: list[str], apply=False
-) -> None:
+) -> int:
     instrument_config = config.get_instrument_config_or_raise(instrument)
-    raw_data_timespan = types.Timespan(instrument_config.timespan_unit)
+    new_feature_names = [
+        feature_name
+        for feature_name in feature_names
+        if feature_name not in instrument_config.feature_names
+    ]
 
-    for feature_name in feature_names:
-        if feature_name not in template.get_feature_names():
-            raise types.MigrationError(
+    allowed_feature_names = template.get_feature_names()
+
+    unapplied_migration_files = 0
+    for feature_name in new_feature_names:
+        # TODO: Maybe this should happen before the loop to avoid abandoned migration files?
+        if feature_name not in allowed_feature_names:
+            raise errors.MigrationError(
                 f"Feature with the name '{feature_name}' does not exist."
             )
 
@@ -212,13 +264,22 @@ def add_instrument_features(
             template.SqlTemplateData(
                 instrument=instrument,
                 quantity=1,
-                timespan=raw_data_timespan,
+                timespan=instrument_config.timespan,
                 reference_table=instrument_config.base_table,
             ),
         )
 
-    if apply:
+        unapplied_migration_files += 1
+
+    if apply and unapplied_migration_files > 0:
         apply_all(connect(), config.migrations_dir())
+        all_feature_names = instrument_config.feature_names + new_feature_names
+        config.update_instrument_config(
+            instrument=instrument, feature_names=all_feature_names
+        )
+        return 0
+
+    return unapplied_migration_files
 
 
 def add_instrument(
@@ -227,10 +288,166 @@ def add_instrument(
     aggregate_timespans: list[types.Timespan] = [],
     feature_names: list[str] = [],
     apply=False,
-) -> None:
-    add_instrument_raw_data(instrument, timespan)
-    add_instrument_aggregates(instrument, aggregate_timespans)
-    add_instrument_features(instrument, feature_names)
+) -> int:
+    unapplied_migration_files = 0
+    unapplied_migration_files += add_instrument_raw_data(
+        instrument, timespan, apply
+    )
+    unapplied_migration_files += add_instrument_aggregates(
+        instrument, aggregate_timespans, apply
+    )
+    unapplied_migration_files += add_instrument_features(
+        instrument, feature_names, apply
+    )
+    return unapplied_migration_files
+
+
+def update_instrument(
+    instrument: types.InstrumentType,
+    aggregate_timespans: list[types.Timespan] | None = None,
+    feature_names: list[str] | None = None,
+    apply=False,
+) -> int:
+    unapplied_migration_files = 0
+    if aggregate_timespans:
+        unapplied_migration_files = add_instrument_aggregates(
+            instrument, aggregate_timespans, apply
+        )
+    if feature_names:
+        unapplied_migration_files = add_instrument_features(
+            instrument, feature_names, apply
+        )
+    return unapplied_migration_files
+
+
+def remove_instrument_features(
+    instrument: types.InstrumentType,
+    feature_names: list[str] | None = None,
+    apply=False,
+) -> int:
+    instrument_config = config.get_instrument_config_or_raise(instrument)
+    feature_names_to_remove = (
+        instrument_config.feature_names
+        if feature_names is None
+        else feature_names
+    )
+
+    unapplied_migration_files = 0
+    for feature_name in feature_names_to_remove:
+        # TODO: Maybe this should happen before the loop to avoid abandoned migration files?
+        if feature_name not in instrument_config.feature_names:
+            raise errors.MigrationError(
+                f"Cannot remove {instrument.value} feature table for '{feature_name}', because it doesn't exist."
+            )
+
+        template.create_migration_file(
+            f"remove_{feature_name}",
+            template.SqlTemplateData(
+                instrument=instrument,
+                quantity=1,
+                timespan=instrument_config.timespan,
+                reference_table=instrument_config.base_table,
+            ),
+        )
+        unapplied_migration_files += 1
+
+    if apply and unapplied_migration_files > 0:
+        apply_all(connect(), config.migrations_dir())
+        feature_names_left = list(
+            set(instrument_config.feature_names) - set(feature_names_to_remove)
+        )
+        config.update_instrument_config(
+            instrument=instrument, feature_names=feature_names_left
+        )
+        return 0
+
+    return unapplied_migration_files
+
+
+def remove_instrument_aggregates(
+    instrument: types.InstrumentType,
+    aggregate_timespans: list[types.Timespan] | None = None,
+    apply=False,
+) -> int:
+    instrument_config = config.get_instrument_config_or_raise(instrument)
+
+    aggregate_timespans_to_remove = (
+        instrument_config.aggregate_timespans
+        if aggregate_timespans is None
+        else aggregate_timespans
+    )
+
+    unapplied_migration_files = 0
+    for aggregate_timespan in aggregate_timespans_to_remove:
+        if aggregate_timespan not in instrument_config.aggregate_timespans:
+            # TODO: Create cleanup function that removes not-applied migrations on a MigrationError
+            raise errors.MigrationError(
+                f"Cannot remove {instrument.value} aggregate table with the frequency '{aggregate_timespan.value}' for raw data with the frequency '{instrument_config.timespan.value}'."
+            )
+
+        template.create_migration_file(
+            "remove_aggregate_candles",
+            template.SqlTemplateData(
+                instrument=instrument,
+                quantity=1,
+                timespan=aggregate_timespan,
+                reference_table=instrument_config.base_table,
+            ),
+        )
+        unapplied_migration_files += 1
+
+    if apply and unapplied_migration_files > 0:
+        apply_all(connect(), config.migrations_dir())
+        aggregate_timespans_left = list(
+            set(instrument_config.aggregate_timespans)
+            - set(aggregate_timespans_to_remove)
+        )
+        config.update_instrument_config(
+            instrument=instrument, aggregate_timespans=aggregate_timespans_left
+        )
+        return 0
+
+    return unapplied_migration_files
+
+
+def remove_instrument_raw_data(
+    instrument: types.InstrumentType, apply=False
+) -> int:
+    instrument_config = config.get_instrument_config_or_raise(instrument)
+    template.create_migration_file(
+        "remove_candles",
+        template.SqlTemplateData(
+            instrument=instrument,
+            quantity=1,
+            timespan=instrument_config.timespan,
+        ),
+    )
+
+    metadata_table = get_instrument_metadata_table(instrument)
+    template.create_migration_file(f"remove_{metadata_table}")
 
     if apply:
         apply_all(connect(), config.migrations_dir())
+        config.remove_instrument_config(instrument)
+        return 0
+
+    return 2
+
+
+def remove_instrument(
+    instrument: types.InstrumentType,
+    apply=False,
+) -> int:
+    unapplied_migration_files = 0
+    unapplied_migration_files += remove_instrument_features(
+        instrument, apply=apply
+    )
+
+    unapplied_migration_files += remove_instrument_aggregates(
+        instrument, apply=apply
+    )
+
+    unapplied_migration_files += remove_instrument_raw_data(
+        instrument, apply=apply
+    )
+    return unapplied_migration_files
