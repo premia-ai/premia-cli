@@ -4,7 +4,7 @@ from openai import OpenAI
 from premia.ai import model
 from premia.db import internals, migration, template, data_import
 from premia.utils import config, types, errors
-from premia.wizard import db_interactive, ai_cmd
+from premia.wizard import db_interactive, ai_interactive
 
 TIMESPAN_CHOICES = [
     types.Timespan.SECOND.value,
@@ -188,7 +188,7 @@ def ai_query(prompt: str, verbose: bool):
             click.secho(e, fg="red")
             sys.exit(1)
 
-    ai_cmd.execute_completion(completion)
+    ai_interactive.execute_completion(completion)
 
 
 @cli.group("db")
