@@ -73,14 +73,14 @@ def add_instrument(
     )
     if response != "no":
         aggregate_timespan = types.Timespan(response)
-        migration.add_instrument_aggregates(instrument, [aggregate_timespan])
+        migration.add_instrument_aggregates(instrument, {aggregate_timespan})
 
     response = click.prompt(
         f"Do you want to create a feature table based on your {instrument.value}' raw data?",
-        type=click.Choice(template.get_feature_names() + ["no"]),
+        type=click.Choice(list(template.get_feature_names()) + ["no"]),
     )
     if response != "no":
-        migration.add_instrument_features(instrument, [response])
+        migration.add_instrument_features(instrument, {response})
 
     migration.apply_all(migration.connect(), config.migrations_dir())
 
@@ -135,9 +135,9 @@ def import_data(
         elif provider == types.DataProvider.CSV:
             import_from_csv(instrument)
         else:
-            raise types.WizardError(f"Unsupported data provider: {provider}")
+            raise errors.WizardError(f"Unsupported data provider: {provider}")
     except Exception as e:
-        raise types.WizardError(e)
+        raise errors.WizardError(e)
 
 
 # TODO: Move the import logic to a separate module
@@ -155,7 +155,7 @@ def import_from_csv(
     )
 
     if not candles_csv_path and not metadata_csv_path and not allow_prompts:
-        raise types.WizardError(
+        raise errors.WizardError(
             "You need to either set CSV paths for candles and metadata or allow prompts."
         )
     elif candles_csv_path and metadata_csv_path:

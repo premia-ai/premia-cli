@@ -5,7 +5,7 @@ from polygon.rest import models
 from datetime import datetime
 import pandas as pd
 from dataclasses import asdict
-from premia.utils import types
+from premia.utils import types, errors
 from premia.db import migration
 
 accepted_timespans = [
@@ -57,7 +57,7 @@ def import_market_data(api_params: types.ApiParams) -> None:
             ),
         )
     except Exception as e:
-        raise types.DataImportError(e)
+        raise errors.DataImportError(e)
 
     market_data_rows = [
         map_agg_to_market_data_row(api_params.symbol[0], agg) for agg in aggs
@@ -70,7 +70,7 @@ def import_market_data(api_params: types.ApiParams) -> None:
             api_params.table, con=con, if_exists="append", index=False
         )
     except Exception as e:
-        raise types.DataImportError(
+        raise errors.DataImportError(
             f"Failed to copy polygon.io data to table '{api_params.table}': {e}"
         )
 

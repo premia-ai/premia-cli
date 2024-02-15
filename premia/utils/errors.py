@@ -25,6 +25,30 @@ class ConfigError(PremiaError):
     pass
 
 
+class DataImportError(PremiaError):
+    """Custom exception class for data import related errors."""
+
+    pass
+
+
+class DbError(PremiaError):
+    """Custom exception class for db related errors."""
+
+    pass
+
+
+class AiError(PremiaError):
+    """Custom exception class for ai related errors."""
+
+    pass
+
+
+class WizardError(PremiaError):
+    """Custom exception class for errors that occur during wizard flows."""
+
+    pass
+
+
 class MissingAiError(ConfigError):
     def __init__(self, message="No AI model has been set up yet."):
         self.message = message

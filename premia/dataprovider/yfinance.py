@@ -1,6 +1,6 @@
 import yfinance as yf
 from dataclasses import dataclass
-from premia.utils import types
+from premia.utils import types, errors
 from premia.db import migration
 
 
@@ -51,6 +51,6 @@ def import_market_data(api_params: types.ApiParams):
             api_params.table, con=con, if_exists="append", index=False
         )
     except Exception as e:
-        raise types.DataImportError(
+        raise errors.DataImportError(
             f"Failed to copy yfinance data to table '{api_params.table}': {e}"
         )

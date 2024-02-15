@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 from dataclasses import asdict
 from urllib.parse import urlencode
-from premia.utils import types
+from premia.utils import types, errors
 from premia.db import migration
 
 
@@ -31,7 +31,7 @@ def import_market_data(api_params: types.ApiParams):
             api_params.table, con=con, if_exists="append", index=False
         )
     except Exception as e:
-        raise types.DataImportError(
+        raise errors.DataImportError(
             f"Failed to copy twelvedata.com data to table '{api_params.table}': {e}"
         )
 
@@ -39,7 +39,7 @@ def import_market_data(api_params: types.ApiParams):
 def get_aggregates(api_params: types.ApiParams):
     api_key = os.getenv("TWELVEDATA_API_KEY")
     if not api_key:
-        raise types.DataImportError(
+        raise errors.DataImportError(
             "Please set TWELVEDATA_API_KEY environment variable"
         )
 
@@ -70,7 +70,9 @@ def get_aggregates(api_params: types.ApiParams):
         return convert_to_market_data_rows(data)
 
     except requests.RequestException as e:
-        raise types.DataImportError(f"Error fetching data from TwelveData: {e}")
+        raise errors.DataImportError(
+            f"Error fetching data from TwelveData: {e}"
+        )
 
 
 def convert_to_market_data_rows(data: Any) -> list[types.MarketDataRow]:

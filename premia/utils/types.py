@@ -176,27 +176,3 @@ class OptionSymbol:
             contract_type=contract_type,
             strike_price=strike_price,
         )
-
-
-class DataImportError(Exception):
-    """Custom exception class for data import related errors."""
-
-    pass
-
-
-class DbError(Exception):
-    """Custom exception class for db related errors."""
-
-    pass
-
-
-class AiError(Exception):
-    """Custom exception class for ai related errors."""
-
-    pass
-
-
-class WizardError(Exception):
-    """Custom exception class for errors that occur during wizard flows."""
-
-    pass
