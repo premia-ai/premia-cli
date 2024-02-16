@@ -1,7 +1,7 @@
 import re
 import click
 from datetime import datetime
-from premia.db import migration
+from cli.db import migration
 
 
 def execute_completion(completion: str):

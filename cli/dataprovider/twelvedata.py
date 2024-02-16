@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import Any
 from dataclasses import asdict
 from urllib.parse import urlencode
-from premia.utils import types, errors
-from premia.db import migration
+from cli.utils import types, errors
+from cli.db import migration
 
 
 accepted_timespans = [

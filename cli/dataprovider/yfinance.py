@@ -1,7 +1,7 @@
 import yfinance as yf
 from dataclasses import dataclass
-from premia.utils import types, errors
-from premia.db import migration
+from cli.utils import types, errors
+from cli.db import migration
 
 
 @dataclass

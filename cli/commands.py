@@ -1,10 +1,10 @@
 import sys
 import click
 from openai import OpenAI
-from premia.ai import model
-from premia.db import internals, migration, template, data_import
-from premia.utils import config, types, errors
-from premia.wizard import db_interactive, ai_interactive
+from cli.ai import model
+from cli.db import internals, migration, template, data_import
+from cli.utils import config, types, errors
+from cli.wizard import db_interactive, ai_interactive
 
 TIMESPAN_CHOICES = [
     types.Timespan.SECOND.value,
@@ -52,12 +52,12 @@ def convert_timespans(
 
 @click.version_option("0.0.2", prog_name="premia")
 @click.group()
-def cli():
+def premia():
     """A cli to setup, manage and interact with financial data infrastructure."""
     pass
 
 
-@cli.group("ai")
+@premia.group("ai")
 def ai_group():
     """Use an AI model to interact with your data infrastructure."""
     pass
@@ -193,7 +193,7 @@ def ai_query(prompt: str, verbose: bool):
     ai_interactive.execute_completion(completion)
 
 
-@cli.group("db")
+@premia.group("db")
 def db_group():
     """Setup and manage your data infrastructure."""
     pass

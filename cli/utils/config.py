@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 import shutil
 import click
-from premia.utils import types, errors
+from cli.utils import types, errors
 
 CONFIG_DIR = ".premia"
 MIGRATIONS_DIR = f"{CONFIG_DIR}/migrations"

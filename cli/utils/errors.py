@@ -1,4 +1,4 @@
-from premia.utils import types
+from cli.utils import types
 
 
 class PremiaError(Exception):

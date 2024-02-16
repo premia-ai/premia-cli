@@ -5,8 +5,8 @@ from polygon.rest import models
 from datetime import datetime
 import pandas as pd
 from dataclasses import asdict
-from premia.utils import types, errors
-from premia.db import migration
+from cli.utils import types, errors
+from cli.db import migration
 
 accepted_timespans = [
     types.Timespan.SECOND,

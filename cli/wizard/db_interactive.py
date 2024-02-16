@@ -1,8 +1,8 @@
 import click
 import os
-from premia.dataprovider import twelvedata, polygon, yfinance
-from premia.utils import config, types, errors
-from premia.db import template, migration
+from cli.dataprovider import twelvedata, polygon, yfinance
+from cli.utils import config, types, errors
+from cli.db import template, migration
 
 providers_per_instrument = {
     types.InstrumentType.STOCKS: [

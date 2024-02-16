@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Literal, cast
-from premia.db import migration
+from cli.db import migration
 
 DB_SCHEMA = "premia"
 

@@ -1,9 +1,9 @@
 from huggingface_hub import hf_hub_download
 from llama_cpp import Llama
 from openai import OpenAI
-from premia.db import internals
-from premia.utils import config, errors
-from premia.utils.loader import Loader
+from cli.db import internals
+from cli.utils import config, errors
+from cli.utils.loader import Loader
 
 
 LOCAL_SYSTEM_PROMPT_TEMPLATE = """

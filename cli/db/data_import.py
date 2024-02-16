@@ -1,6 +1,6 @@
 import os
-from premia.db import migration
-from premia.utils import types, config
+from cli.db import migration
+from cli.utils import types, config
 
 
 def raw_data_from_csv(

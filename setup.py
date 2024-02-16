@@ -17,5 +17,5 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     install_requires=load_requirements(),
-    entry_points={"console_scripts": ["premia = premia.cli:cli"]},
+    entry_points={"console_scripts": ["premia = cli.commands:premia"]},
 )

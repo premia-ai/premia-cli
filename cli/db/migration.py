@@ -1,8 +1,8 @@
 import os
 from typing import cast
 import duckdb
-from premia.utils import types, config, errors
-from premia.db import template
+from cli.utils import types, config, errors
+from cli.db import template
 
 
 def connect(create_if_missing=False) -> duckdb.DuckDBPyConnection:
