@@ -1,4 +1,4 @@
-# Premia Cli
+# Premia
 
 _AI co-pilot for asset managers._
 
@@ -12,8 +12,8 @@ The easiest way to try Premia is to follow the following steps:
 
 ```sh
 # Download project
-$ git clone https://github.com/premia-ai/cli premia-cli
-$ cd premia-cli
+$ git clone https://github.com/premia-ai/premia
+$ cd premia
 
 # Install project
 $ chmod +x bin/install.sh
