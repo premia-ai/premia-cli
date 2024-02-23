@@ -19,11 +19,22 @@ $ cd premia
 $ chmod +x bin/install.sh
 $ bin/install.sh
 
-# Set up sample DB and optionally import data
-$ premia db init
+# Set up Premia with a sample DB
+$ premia config setup
+$ premia db connect
 
-# Set up local AI
-$ premia ai init
+# Set up DB for stocks
+$ premia db set stocks --raw-frequency minute --aggregate-frequency day --feature returns
+
+# Import some sample data
+$ premia data csv copy ./sample_data/sample_stocks_1_minute_candles.csv --table stocks_1_minute_candles
+$ premia data csv copy ./sample_data/sample_companies.csv --table companies
+
+# Set up remote AI
+$ premia config set ai remote "your-open-ai-api-key"
+
+# Start interacting with the AI
+$ premia ai query "Get stock returns for the company 'NVIDIA Corporation'."
 ```
 
 ## Setup
@@ -34,6 +45,8 @@ Run the following commands in your terminal from the repo's folder, to install t
 $ chmod +x bin/install.sh
 $ bin/install.sh
 ```
+
+**Important: The explanation of the commands is out of date at the moment. Use --help instead.**
 
 ## Commands
 

@@ -1,112 +1,163 @@
 import sys
+from datetime import datetime
+from typing import Literal
 import click
-from openai import OpenAI
-from cli.ai import model
-from cli.db import internals, migration, template, data_import
-from cli.utils import config, types, errors
-from cli.wizard import db_interactive, ai_interactive
+import premia
+from premia.config._internal.config import DEFAULT_DATABASE_PATH
+from . import utils
 
-TIMESPAN_CHOICES = [
-    types.Timespan.SECOND.value,
-    types.Timespan.MINUTE.value,
-    types.Timespan.HOUR.value,
-    types.Timespan.DAY.value,
+TIMESPAN_CHOICES: list[premia.Timespan] = [
+    "second",
+    "minute",
+    "hour",
+    "day",
 ]
 
-INSTRUMENT_CHOICES = [
-    types.InstrumentType.STOCKS.value,
-    types.InstrumentType.OPTIONS.value,
+INSTRUMENT_CHOICES: list[premia.InstrumentType] = [
+    "stocks",
+    "options",
 ]
 
-FEATURE_NAME_CHOICES = list(template.get_feature_names())
+FEATURE_NAME_CHOICES = list(premia.db.features())
 
-PROVIDER_CHOICES = [types.DataProvider.CSV.value]
-AI_MODEL_CHOICES: list[types.AiModel] = ["local", "remote"]
-
-
-def convert_required_instrument_type(
-    ctx, param: str, value: str
-) -> types.InstrumentType:
-    return types.InstrumentType(value)
-
-
-def convert_required_data_provider(
-    ctx, param: str, value: str
-) -> types.DataProvider:
-    return types.DataProvider(value)
-
-
-def convert_optional_timespan(
-    ctx, param: str, value: str | None
-) -> types.Timespan | None:
-    if value is None:
-        return value
-    return types.Timespan(value)
-
-
-def convert_timespans(
-    ctx, param: str, value: list[str]
-) -> list[types.Timespan]:
-    return [types.Timespan(v) for v in value]
+PROVIDER_CHOICES: list[premia.data.ProviderType] = ["csv"]
+AI_MODEL_CHOICES: list[premia.ModelType] = ["local", "remote"]
 
 
 @click.version_option("0.0.2", prog_name="premia")
 @click.group()
-def premia():
-    """A cli to setup, manage and interact with financial data infrastructure."""
+def premia_cli():
+    """Setup, manage and interact with financial data infrastructure."""
     pass
 
 
-@premia.group("ai")
-def ai_group():
-    """Use an AI model to interact with your data infrastructure."""
+@premia_cli.group("config")
+def config_group():
+    """Setup and interact with Premia's configuration."""
     pass
 
 
-@ai_group.command("config")
-def ai_config():
+@config_group.command("setup")
+def config_setup():
+    """Setup Premia."""
+    try:
+        premia.config.setup()
+        click.secho("Successfully setup Premia's configuration.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+
+
+@config_group.group("get", invoke_without_command=True)
+@click.pass_context
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Returns the config as a JSON string.",
+)
+def config_get_group(ctx, as_json: bool):
+    """Print configuration to stdout.premia/premia/config/_internal/types.py"""
+    if ctx.invoked_subcommand is not None:
+        return
+
+    try:
+        fmt = "json" if as_json else "yaml"
+        click.echo(premia.config.get_str(fmt=fmt))
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@config_get_group.command("ai")
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Returns the config as a JSON string.",
+)
+def config_get_ai(as_json: bool):
     """Print AI config to stdout."""
-    ai_config = config.get_ai_config_or_raise()
-
-    remote_config_str = ""
-    if ai_config.remote:
-        remote_config_str = f"""\
-Remote:
-  OpenAI Details:
-    API-Key: {ai_config.remote.api_key}
-    Model: {ai_config.remote.model}
-"""
-    local_config_str = ""
-    if ai_config.local:
-        local_config_str = f"""\
-Local:
-  Huggingface Details:
-    User: {ai_config.local.user}
-    Repo: {ai_config.local.repo}
-    Filename: {ai_config.local.filename}
-"""
-
-    output = f"""\
-Preference: {ai_config.preference}
-{remote_config_str}{local_config_str}"""
-
-    click.echo(output.strip())
+    try:
+        fmt = "json" if as_json else "yaml"
+        click.echo(premia.config.get_ai_str(fmt=fmt))
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
 
-@ai_group.command("remove")
-@click.argument("model_type", type=click.Choice(AI_MODEL_CHOICES))
-def ai_remove(model_type: types.AiModel):
-    """Remove a set up AI model."""
-    config.remove_ai_model_config(model_type)
-    click.secho(f"Successfully removed {model_type} AI model.", fg="green")
+@config_get_group.command("db")
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Returns the config as a JSON string.",
+)
+def config_get_db(as_json: bool):
+    """Print DB config to stdout."""
+    try:
+        fmt = "json" if as_json else "yaml"
+        click.echo(premia.config.get_db_str(fmt=fmt))
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
 
-@ai_group.group("add")
-def ai_add():
-    """Add the AI model you want to use with Premia."""
+@config_get_group.command("providers")
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Returns the config as a JSON string.",
+)
+def config_get_providers(as_json: bool):
+    """Print data providers config to stdout."""
+    try:
+        fmt = "json" if as_json else "yaml"
+        click.echo(premia.config.get_providers_str(fmt=fmt))
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
 
-@ai_add.command("local")
+@config_group.group("set")
+def config_set_group():
+    """Set configuration data"""
+    pass
+
+
+@config_set_group.command("provider")
+@click.argument("provider", type=click.Choice(["polygon", "twelvedata"]))
+@click.argument("api_key")
+def config_set_provider(
+    provider: Literal["polygon", "twelvedata"], api_key: str
+):
+    """Set the API-Key of a data provider."""
+    try:
+        if provider == "polygon":
+            premia.config.set_provider_polygon(api_key)
+            click.secho("Successfully set Polygon API-Key.", fg="green")
+        elif provider == "twelvedata":
+            premia.config.set_provider_twelvedata(api_key)
+            click.secho("Successfully set TwelveData API-Key.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@config_set_group.group("ai")
+def config_set_ai_group():
+    """Set the AI model you want to use with Premia."""
+
+
+@config_set_ai_group.command("local")
 @click.argument("link", type=str)
 @click.option(
     "-f",
@@ -115,19 +166,22 @@ def ai_add():
     is_flag=True,
     help="Force the download of the local model",
 )
-def ai_add_local(
+def config_set_ai_local(
     link: str,
     force: bool,
 ):
-    """Add a local AI model with a huggingface LINK. The link should point to a model's GGUF file."""
+    """Set local AI model with a huggingface LINK. The link should point to a model's GGUF file."""
 
-    model.get_local_model_path(link, force)
-    config.update_ai_config(model_type="local")
-    click.secho("Successfully set up local AI model.", fg="green")
+    try:
+        premia.config.set_ai_local(link, force)
+        click.secho("Successfully set local AI model.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
 
-@ai_add.command("remote")
-@click.argument("api_key", type=str)
+@config_set_ai_group.command("remote")
+@click.argument("api_key")
 @click.option(
     "-m",
     "--model",
@@ -136,33 +190,115 @@ def ai_add_local(
     help="The OpenAI model you would like to use",
     default="gpt-3.5-turbo",
 )
-def ai_add_remote(
+def config_set_ai_remote(
     api_key: str,
     model_name: str,
 ):
-    """Add a remote AI model with an OpenAI API_KEY."""
-    model.setup_remote_model(api_key, model_name)
-    config.update_ai_config(model_type="remote")
-    click.secho("Successfully set up remote AI model.", fg="green")
-
-
-@ai_group.command("preference")
-@click.argument("model_type", type=click.Choice(AI_MODEL_CHOICES))
-def ai_set_preference(model_type: types.AiModel):
-    """Select which model you want to use for your queries."""
+    """Set remote AI model with an OpenAI API_KEY."""
     try:
-        config.update_ai_config(model_type)
-    except errors.ConfigError as e:
-        click.secho(e, fg="red")
+        premia.config.set_ai_remote(api_key, model_name)
+        click.secho("Successfully set remote AI model.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
         sys.exit(1)
 
-    click.secho(
-        f"Premia will use {model_type} model from now on.",
-        fg="green",
-    )
+
+@config_set_ai_group.command("preference")
+@click.argument("model_type", type=click.Choice(AI_MODEL_CHOICES))
+def config_set_ai_preference(model_type: premia.ModelType):
+    """Select which model you want to use for your queries."""
+    try:
+        premia.config.update_ai(model_type)
+        click.secho(
+            f"Premia will use {model_type} model from now on.",
+            fg="green",
+        )
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@config_group.group("remove")
+def config_remove_group():
+    """Remove values from the configuration."""
+    pass
+
+
+@config_remove_group.command("ai")
+@click.argument("model_type", type=click.Choice(AI_MODEL_CHOICES))
+def config_remove_ai(model_type: premia.ModelType):
+    """Remove a set up AI model."""
+    try:
+        premia.config.remove_ai(model_type)
+        click.secho(f"Successfully removed {model_type} AI model.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@premia_cli.group("ai")
+def ai_group():
+    """Use an AI model to interact with your data infrastructure."""
+    pass
 
 
 @ai_group.command("query")
+@click.argument("prompt")
+@click.option(
+    "-p",
+    "--persist",
+    is_flag=True,
+    default=False,
+    help="Persist the result to your DB.",
+)
+@click.option(
+    "-v",
+    "--verbose",
+    default=False,
+    is_flag=True,
+    help="Print the execution of the AI model. This option only works with the local model.",
+)
+@click.option(
+    "-r",
+    "--rows",
+    type=int,
+    help="Maximal number of rows displayed. Defaults to 10. For all rows use -1",
+    default=10,
+)
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def ai_query(
+    prompt: str,
+    persist: bool,
+    verbose: bool,
+    rows: int,
+    as_json: bool,
+    as_csv: bool,
+):
+    """Query your data with the help of an AI model."""
+    try:
+        result = premia.ai.query(prompt, persist=persist, verbose=verbose)
+        utils.echo_df(result.data, rows=rows, as_json=as_json, as_csv=as_csv)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@ai_group.command("ask")
 @click.argument("prompt")
 @click.option(
     "-v",
@@ -171,246 +307,149 @@ def ai_set_preference(model_type: types.AiModel):
     is_flag=True,
     help="Print the execution of the AI model. This option only works with the local model.",
 )
-def ai_query(prompt: str, verbose: bool):
-    """Query your data with the help of an AI model."""
-    ai_config = config.get_ai_config()
-    if not ai_config:
-        click.secho(
-            "Please setup an AI model before running a query.", fg="red"
-        )
+def ai_ask(prompt: str, verbose: bool):
+    """Ask an AI model about your financial data system."""
+    try:
+        utils.echo_iter(premia.ai.ask_iter(prompt, verbose))
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
         sys.exit(1)
 
-    if ai_config.preference == "remote" and ai_config.remote:
-        client = OpenAI(api_key=ai_config.remote.api_key)
-        completion = model.create_remote_completion(prompt, client)
-    else:
-        try:
-            completion = model.create_local_completion(prompt, verbose=verbose)
-        except errors.ConfigError as e:
-            click.secho(e, fg="red")
-            sys.exit(1)
 
-    ai_interactive.execute_completion(completion)
-
-
-@premia.group("db")
+@premia_cli.group("db")
 def db_group():
     """Setup and manage your data infrastructure."""
     pass
 
 
-@db_group.command("config")
-def db_config():
-    """Print DB config to stdout."""
-    db_config = config.get_db_config_or_raise()
+@db_group.command("connect")
+@click.option(
+    "-p",
+    "--path",
+    help="The path to your database file. If no path is added a new DB is created.",
+)
+def db_setup(path: str | None):
+    """Connect Premia to a database or create a default database."""
+    try:
+        premia.db.connect(create_if_missing=True, path=path)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
-    instruments = ""
-    for instrument, instrument_config in db_config.instruments.items():
-        if not instruments:
-            instruments = "Instruments:\n"
-
-        instruments = (
-            instruments
-            + f"""\
-  {instrument.value.capitalize()}:
-    Metadata Table: {instrument_config.metadata_table}
-    Raw Data Timespan: {instrument_config.timespan.value}
-"""
-        )
-
-        if len(instrument_config.aggregate_timespans):
-            aggregate_timespan_values = [
-                a.value for a in instrument_config.aggregate_timespans
-            ]
-            instruments = (
-                instruments
-                + f"""\
-    Aggregate Timespans: {', '.join(aggregate_timespan_values)}
-"""
-            )
-
-        if len(instrument_config.feature_names):
-            instruments = (
-                instruments
-                + f"""\
-    Features: {', '.join(instrument_config.feature_names)}
-"""
-            )
-
-    output = f"""\
-Type: {db_config.type}
-{instruments}"""
-
-    click.echo(output.strip())
+    click.secho(
+        f"Successfully set up new database at: {path or DEFAULT_DATABASE_PATH}",
+        fg="green",
+    )
 
 
 @db_group.command("schema")
 def db_schema():
     """Print schema of your database."""
     try:
-        db_schema = internals.inspect()
-        click.echo(db_schema)
+        click.echo(premia.db.schema())
     except Exception as e:
-        click.secho(e, fg="red")
+        click.secho(e, fg="red", err=True)
         sys.exit(1)
 
 
 @db_group.command("tables")
-def db_tables():
-    """List tables in your database."""
-    try:
-        tables = internals.tables()
-        if tables:
-            click.echo("\n".join(tables))
-        else:
-            click.echo("No tables set up yet.")
-    except ValueError as e:
-        click.secho(e, fg="red")
-        sys.exit(1)
-
-
-@db_group.command("setup")
 @click.option(
-    "-p",
-    "--path",
-    help="A path to where your database is located",
-)
-def db_setup(path: str | None):
-    """Connect Premia to a database or create a default database."""
-    if not path:
-        db_config = config.create_db_config()
-        migration.connect(create_if_missing=True)
-        click.secho(
-            f"Successfully set up new database at: {db_config.path}",
-            fg="green",
-        )
-
-
-@db_group.command("init")
-def db_init():
-    """Initialize a financial database."""
-    config.setup_config_dir()
-
-    try:
-        db_interactive.setup()
-    except Exception as e:
-        click.secho(e, fg="red")
-        sys.exit(1)
-
-    if not click.confirm("Do you want to seed the db?"):
-        return
-
-    try:
-        db_interactive.seed()
-    except Exception as e:
-        click.secho(e, fg="red")
-        sys.exit(1)
-
-
-@db_group.command("import")
-@click.argument(
-    "instrument",
-    type=click.Choice(INSTRUMENT_CHOICES),
-    callback=convert_required_instrument_type,
-)
-@click.option(
-    "-p",
-    "--provider",
-    "data_provider",
-    help="Which provider to use for the import. Defaults to CSV.",
-    type=click.Choice(PROVIDER_CHOICES),
-    default=types.DataProvider.CSV.value,
-    callback=convert_required_data_provider,
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
 )
 @click.option(
     "-c",
-    "--candles-path",
-    help="File path for the instrument's candles data stored in a CSV to seed the table.",
-)
-# TODO: This should be much better explained. We should explain how the different tables look like for instruments that are set up.
-@click.option(
-    "-m",
-    "--metadata-path",
-    help="File path for the metadata stored in a CSV to seed the instrument's table.",
-)
-@click.option(
-    "-i",
-    "--interactive",
-    default=False,
+    "--csv",
+    "as_csv",
     is_flag=True,
-    help="Set up the instrument using interactive prompts. This ignores all other flags.",
+    default=False,
+    help="Print result as CSV.",
 )
-def db_import(
-    instrument: types.InstrumentType,
-    data_provider: types.DataProvider,
-    candles_path: str | None,
-    metadata_path: str | None,
-    interactive: bool,
-):
-    """
-    Import data from common financial data vendors.
-    """
-    if interactive:
-        try:
-            db_interactive.import_data(instrument)
-            return
-        except Exception as e:
-            click.secho(e, fg="red")
+def db_tables(as_json: bool, as_csv: bool):
+    """Print tables of your database to stdout."""
+    try:
+        tables = premia.db.tables()
+        if tables:
+            utils.echo_list(tables, as_json=as_json, as_csv=as_csv)
+        else:
+            click.secho("No tables set up yet.", fg="red", err=True)
             sys.exit(1)
-
-    if (
-        data_provider == types.DataProvider.CSV
-        and candles_path
-        and metadata_path
-    ):
-        data_import.raw_data_from_csv(
-            instrument,
-            candles_csv_path=candles_path,
-            metadata_csv_path=metadata_path,
-        )
-        click.secho(
-            f"Successfully imported data from '{candles_path}' and '{metadata_path}'",
-            fg="green",
-        )
-    elif data_provider == types.DataProvider.CSV and candles_path:
-        data_import.raw_data_from_csv(instrument, candles_csv_path=candles_path)
-        click.secho(
-            f"Successfully imported data from '{candles_path}'", fg="green"
-        )
-    elif data_provider == types.DataProvider.CSV and metadata_path:
-        data_import.raw_data_from_csv(
-            instrument, metadata_csv_path=candles_path
-        )
-        click.secho(
-            f"Successfully imported data from '{metadata_path}'", fg="green"
-        )
-    else:
-        # TODO: This needs to be implemented
-        click.secho(
-            "This command has not been finished yet. Other dataproviders and import methods will follow soon.",
-            fg="red",
-        )
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
         sys.exit(1)
 
 
 @db_group.command("table")
 @click.argument("table_name")
-def db_table(table_name: str):
-    con = migration.connect()
-    con.sql(f"FROM {table_name};").show()
+@click.option(
+    "-r",
+    "--rows",
+    type=int,
+    help="Maximal number of rows displayed. Defaults to 10. For all rows use -1",
+    default=10,
+)
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def db_table(table_name: str, rows: int, as_json: bool, as_csv: bool):
+    """Print a preview of the table's content to stdout."""
+    try:
+        df = premia.db.table(table_name)
+        utils.echo_df(df, rows=rows, as_json=as_json, as_csv=as_csv)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
 
 @db_group.command("features")
-def db_features():
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def db_features(as_json: bool, as_csv: bool):
     """Prints a list of available features to stdout."""
-    click.echo("\n".join(template.get_feature_names()))
+    try:
+        utils.echo_list(
+            list(premia.db.features()), as_json=as_json, as_csv=as_csv
+        )
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
 
-@db_group.command("add")
+@db_group.command("set")
 @click.argument(
     "instrument",
     type=click.Choice(INSTRUMENT_CHOICES),
-    callback=convert_required_instrument_type,
 )
 @click.option(
     "-r",
@@ -418,7 +457,6 @@ def db_features():
     "timespan",
     help="The frequency the raw candle data has.",
     type=click.Choice(TIMESPAN_CHOICES),
-    callback=convert_optional_timespan,
 )
 @click.option(
     "-a",
@@ -427,7 +465,6 @@ def db_features():
     multiple=True,
     help="Create aggregate tables based on raw candle data. Value needs to be bigger than frequency",
     type=click.Choice(TIMESPAN_CHOICES),
-    callback=convert_timespans,
 )
 @click.option(
     "-f",
@@ -437,67 +474,35 @@ def db_features():
     help="Create feature tables based on original data table",
     type=click.Choice(FEATURE_NAME_CHOICES),
 )
-@click.option(
-    "-i",
-    "--interactive",
-    default=False,
-    is_flag=True,
-    help="Set up the instrument using interactive prompts. This ignores all other flags.",
-)
-def db_add(
-    instrument: types.InstrumentType,
-    timespan: types.Timespan | None,
-    aggregate_timespans: list[types.Timespan],
+def db_set_instrument(
+    instrument: premia.InstrumentType,
+    timespan: premia.Timespan | None,
+    aggregate_timespans: list[premia.Timespan],
     feature_names: list[str],
-    interactive: bool,
 ):
     """
-    Add database tables for a given instrument type. Only use this command when the database is already setup. Prefer `init` otherwise.
+    Set database tables for a given instrument. Only use this command when the database is already setup.
     """
     unique_aggregate_timespans = set(aggregate_timespans)
     unique_feature_names = set(feature_names)
-    if interactive:
-        db_interactive.add_instrument(instrument)
-    elif timespan:
-        try:
-            migration.add_instrument(
-                instrument,
-                timespan,
-                unique_aggregate_timespans,
-                unique_feature_names,
-                apply=True,
-            )
-        except errors.MigrationError as e:
-            click.secho(e, fg="red")
-            sys.exit(1)
-
-        click.secho(
-            f"Successfully set up {instrument.value}.",
-            fg="green",
+    try:
+        premia.db.set_instrument(
+            instrument,
+            timespan,
+            unique_aggregate_timespans,
+            unique_feature_names,
         )
-    else:
-        try:
-            migration.update_instrument(
-                instrument,
-                unique_aggregate_timespans,
-                unique_feature_names,
-                apply=True,
-            )
-        except errors.PremiaError as e:
-            click.secho(e, fg="red")
-            sys.exit(1)
-
-        click.secho(
-            f"Successfully updated {instrument.value}.",
-            fg="green",
-        )
+        # TODO: Differentiate in the message more what actually happened.
+        click.secho(f"Successfully set {instrument}.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
 
 
 @db_group.command("remove")
 @click.argument(
     "instrument",
     type=click.Choice(INSTRUMENT_CHOICES),
-    callback=convert_required_instrument_type,
 )
 @click.option(
     "-a",
@@ -506,7 +511,6 @@ def db_add(
     multiple=True,
     help="Remove aggregate tables that you have created previously.",
     type=click.Choice(TIMESPAN_CHOICES),
-    callback=convert_timespans,
 )
 @click.option(
     "-f",
@@ -516,48 +520,22 @@ def db_add(
     help="Remove feature tables that you have created previously.",
     type=click.Choice(FEATURE_NAME_CHOICES),
 )
-def db_remove(
-    instrument: types.InstrumentType,
-    aggregate_timespans: list[types.Timespan],
+def db_remove_instrument(
+    instrument: premia.InstrumentType,
+    aggregate_timespans: list[premia.Timespan],
     feature_names: list[str],
 ):
     """Remove an instrument that you have set up with Premia."""
     unique_feature_names = set(feature_names)
     unique_aggregate_timespans = set(aggregate_timespans)
-    # TODO: Can this be simplified? It seems awkward
-    # TODO: The success messages are kind of lazy. We should give more details.
     try:
-        if (
-            len(unique_aggregate_timespans) == 0
-            and len(unique_feature_names) == 0
-        ):
-            migration.remove_instrument(instrument, apply=True)
-            click.secho(
-                f"Successfully removed {instrument.value} from your system.",
-                fg="green",
-            )
-            return
-
-        if len(unique_aggregate_timespans) > 0:
-            migration.remove_instrument_aggregates(
-                instrument,
-                aggregate_timespans=unique_aggregate_timespans,
-                apply=True,
-            )
-            click.secho(
-                f"Successfully removed {instrument.value}' aggregate tables from your system.",
-                fg="green",
-            )
-        if len(unique_feature_names) > 0:
-            migration.remove_instrument_features(
-                instrument, feature_names=unique_feature_names, apply=True
-            )
-            click.secho(
-                f"Successfully removed {instrument.value}' feature tables from your system.",
-                fg="green",
-            )
-    except errors.MigrationError as e:
-        click.secho(e, fg="red")
+        premia.db.remove_instrument(
+            instrument, unique_aggregate_timespans, unique_feature_names
+        )
+        # TODO: Differentiate in the message more what actually happened.
+        click.secho(f"Successfully removed {instrument}.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
         sys.exit(1)
 
 
@@ -570,12 +548,345 @@ def db_remove(
     help="Reset the database without being prompted.",
 )
 def db_reset(yes: bool):
+    """Reset your database."""
     if yes or click.confirm("Are you sure you want to reset your database?"):
-        migration.reset()
-        click.secho("Successfully reset the database.", fg="green")
+        try:
+            premia.db.reset()
+            click.secho("Successfully reset the database.", fg="green")
+        except Exception as e:
+            click.secho(e, fg="red", err=True)
+            sys.exit(1)
 
 
 @db_group.command("purge")
 def db_purge():
-    migration.remove_ai_responses()
-    click.secho("Successfully removed cached AI responses.", fg="green")
+    """Remove all cached ai responses from your database."""
+    try:
+        premia.db.purge()
+        click.secho("Successfully removed cached AI responses.", fg="green")
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@premia_cli.group("data")
+def data_group():
+    """Download and import market data"""
+    pass
+
+
+@data_group.group("yfinance")
+def data_yfinance_group():
+    """Download market data from yfinance"""
+    pass
+
+
+@data_yfinance_group.command("stocks")
+@click.argument("symbol")
+@click.option(
+    "-s",
+    "--start",
+    type=click.DateTime(),
+    help="Start date (in UTC) of the data. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-e",
+    "--end",
+    type=click.DateTime(),
+    default=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    help="End date (in UTC) of the data. Defaults to the current moment. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-p",
+    "--persist",
+    is_flag=True,
+    default=False,
+    help="Persist the result to your DB.",
+)
+@click.option(
+    "-r",
+    "--rows",
+    type=int,
+    help="Maximal number of rows displayed. Defaults to 10. For all rows use -1",
+    default=10,
+)
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def data_yfinance_stocks(
+    symbol: str,
+    start: datetime,
+    end: datetime,
+    persist: bool,
+    rows: int,
+    as_json: bool,
+    as_csv: bool,
+):
+    try:
+        df = premia.data.yfinance.stocks(symbol, start, end, persist)
+        utils.echo_df(df, rows=rows, as_json=as_json, as_csv=as_csv)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@data_group.group("twelvedata")
+def data_twelvedata_group():
+    """Download market data from twelvedata"""
+    pass
+
+
+@data_twelvedata_group.command("stocks")
+@click.argument("symbol")
+@click.option(
+    "-s",
+    "--start",
+    type=click.DateTime(),
+    help="Start date (in UTC) of the data. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-e",
+    "--end",
+    type=click.DateTime(),
+    default=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    help="End date (in UTC) of the data. Defaults to the current moment. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-p",
+    "--persist",
+    is_flag=True,
+    default=False,
+    help="Persist the result to your DB.",
+)
+@click.option(
+    "-r",
+    "--rows",
+    type=int,
+    help="Maximal number of rows displayed. Defaults to 10. For all rows use -1",
+    default=10,
+)
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def data_twelvedata_stocks(
+    symbol: str,
+    start: datetime,
+    end: datetime,
+    persist: bool,
+    rows: int,
+    as_json: bool,
+    as_csv: bool,
+):
+    try:
+        df = premia.data.twelvedata.stocks(symbol, start, end, persist)
+        utils.echo_df(df, rows=rows, as_json=as_json, as_csv=as_csv)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@data_group.group("polygon")
+def data_polygon_group():
+    """Download market data from polygon"""
+    pass
+
+
+@data_polygon_group.command("stocks")
+@click.argument("symbol")
+@click.option(
+    "-s",
+    "--start",
+    type=click.DateTime(),
+    help="Start date (in UTC) of the data. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-e",
+    "--end",
+    type=click.DateTime(),
+    default=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    help="End date (in UTC) of the data. Defaults to the current moment. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-p",
+    "--persist",
+    is_flag=True,
+    default=False,
+    help="Persist the result to your DB.",
+)
+@click.option(
+    "-r",
+    "--rows",
+    type=int,
+    help="Maximal number of rows displayed. Defaults to 10. For all rows use -1",
+    default=10,
+)
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def data_polygon_stocks(
+    symbol: str,
+    start: datetime,
+    end: datetime,
+    persist: bool,
+    rows: int,
+    as_json: bool,
+    as_csv: bool,
+):
+    try:
+        df = premia.data.polygon.stocks(symbol, start, end, persist)
+        utils.echo_df(df, rows=rows, as_json=as_json, as_csv=as_csv)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@data_polygon_group.command("options")
+@click.option(
+    "-s",
+    "--start",
+    type=click.DateTime(),
+    help="Start date (in UTC) of the data. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-e",
+    "--end",
+    type=click.DateTime(),
+    default=datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    help="End date (in UTC) of the data. Defaults to the current moment. Can have the following formats: '2008-09-15', '2008-09-15T09:30:00', '2008-09-15 09:30:00'",
+)
+@click.option(
+    "-p",
+    "--persist",
+    is_flag=True,
+    default=False,
+    help="Persist the result to your DB.",
+)
+@click.option(
+    "-r",
+    "--rows",
+    type=int,
+    help="Maximal number of rows displayed. Defaults to 10. For all rows use -1",
+    default=10,
+)
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def polygon_options(
+    symbol: str,
+    start: datetime,
+    end: datetime,
+    persist: bool,
+    rows: int,
+    as_json: bool,
+    as_csv: bool,
+):
+    try:
+        df = premia.data.polygon.options(symbol, start, end, persist)
+        utils.echo_df(df, rows=rows, as_json=as_json, as_csv=as_csv)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)
+
+
+@data_group.group("csv")
+def data_csv_group():
+    """Import data using CSV files"""
+
+
+@data_csv_group.command("copy")
+@click.argument("file_path")
+@click.option(
+    "-t",
+    "--table",
+    "table_name",
+    help="Name of the table the data should be stored in.",
+)
+@click.option(
+    "-r",
+    "--rows",
+    type=int,
+    help="Maximal number of rows displayed. Defaults to 10. For all rows use -1",
+    default=10,
+)
+@click.option(
+    "-j",
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Print result as JSON.",
+)
+@click.option(
+    "-c",
+    "--csv",
+    "as_csv",
+    is_flag=True,
+    default=False,
+    help="Print result as CSV.",
+)
+def data_csv_copy(
+    file_path: str,
+    table_name: str | None,
+    rows: int,
+    as_json: bool,
+    as_csv: bool,
+):
+    """Copy data from a CSV and optionally store it in your DB by specifying a table name."""
+    try:
+        df = premia.data.csv.copy(file_path, table_name)
+        utils.echo_df(df, rows=rows, as_json=as_json, as_csv=as_csv)
+    except Exception as e:
+        click.secho(e, fg="red", err=True)
+        sys.exit(1)

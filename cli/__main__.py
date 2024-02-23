@@ -1,3 +1,3 @@
 import cli.commands
 
-cli.commands.premia()
+cli.commands.premia_cli()
